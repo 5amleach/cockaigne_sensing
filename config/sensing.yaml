@@ -1,0 +1,63 @@
+# Every adjustable number in the sensing system lives in this file.
+# Code reads it at start-up. Nothing in the code carries its own copy of these values.
+
+floor:
+  width_m: 12.0     # across the room. Replace with the measured figure.
+  length_m: 9.0     # along the room, towards the closed end of the U.
+
+cameras:
+  # One entry per camera. The password is not stored here: set the environment
+  # variable COCKAIGNE_RTSP_PASSWORD on the sensing machine.
+  - name: cam1
+    ip: 192.168.1.101
+    user: admin
+    stream: sub          # sub for detection; main only when a module asks for a close look
+    homography: config/homography_cam1.json   # produced by tools.calibrate; missing until then
+    floor_polygon: []    # pixel corners of the visible floor in this camera's detection frame,
+                         # e.g. [[0, 700], [640, 700], [560, 360], [80, 360]]. Feet outside are
+                         # ignored, which is what stops figures in the wall imagery counting as people.
+  # - name: cam2
+  #   ip: 192.168.1.102
+  #   ...
+
+detector:
+  model: yolo11s.pt    # pretrained Ultralytics weights, person class only
+  imgsz: 1280          # input size the detector sees; 1280 found the far seated person, 640 may not
+  conf: 0.25           # minimum confidence to keep a detection
+  tracker: bytetrack.yaml
+  device: auto         # auto picks the GPU when present, otherwise CPU
+  min_track_age_s: 1.0 # a track younger than this is not reported; removes one-frame flickers
+
+floor_tracker:
+  merge_distance_m: 0.5   # two floor positions closer than this are the same person
+  drop_after_s: 3.0       # a person unseen for this long is removed
+  velocity_window_s: 1.0  # velocity is averaged over this window
+
+cohesion:
+  smooth_window_s: 10.0   # weighted average window for the raw score
+  still_speed_mps: 0.15   # slower than this counts as standing still
+  occupancy_window_s: 10.0   # headcount is smoothed over this before it is used for blending
+  blend_weight_by_n: [[1, 0.0], [2, 0.5], [3, 0.9], [4, 1.0]]  # weight on relational cohesion vs proxy, by smoothed headcount
+  proxy_ceiling: 0.75     # the proxy score can never exceed this; ring_up[3] is above it on purpose
+  proxy_dwell_full_s: 120 # dwell counts as full after this long in the room
+  proxy_near_wall_m: 1.5  # closer than this to a wall counts as full proximity
+  rise_rate_per_s: 0.02   # how fast the reservoir rises toward a higher score
+  fall_rate_per_s: 0.01   # how fast it falls toward a lower score
+  ring_up:   [0.2, 0.4, 0.6, 0.8]   # reservoir level needed to reach ring 1, 2, 3, 4
+  ring_down: [0.1, 0.3, 0.5, 0.7]   # level below which the ring drops to 0, 1, 2, 3
+
+mood:
+  label_dwell_s: 8.0      # a person's mood label holds at least this long before it can change
+  sitting_ratio: 0.75     # box width / height above this, while stopped, reads as sitting
+
+actions:
+  model: qwen2.5vl:3b     # Ollama model tag; alternatives gemma3:4b, moondream
+  interval_s: 3.0         # how often each person is asked about
+  agree_readings: 2       # readings in a row that must agree before an action is reported
+  baseline_window_s: 600  # window for each action's running baseline rate
+  enabled: [phone, drink, eat]   # Sam confirmed 19 Sept 2026 that eat and drink are in scope
+
+bus:
+  host: 127.0.0.1
+  port: 8765
+  ledger_path: ledger.jsonl

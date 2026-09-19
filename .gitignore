@@ -1,0 +1,11 @@
+# weights are downloaded on first run
+*.pt
+# never commit footage or recordings
+*.mkv
+*.mp4
+*.jsonl
+bench/out/
+bench/*/snap_*.jpg
+__pycache__/
+*.egg-info/
+.pytest_cache/
