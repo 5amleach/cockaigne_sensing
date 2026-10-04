@@ -15,8 +15,11 @@ Crowd, once a second:
   on. Leave two placeholder signals returning 1.0 so more can be added.
 - proxy score A: what the estimator falls back on when there is nobody
   to be relational with. Built from dwell (time in room), stillness and
-  proximity to the wall, each scaled 0 to 1, averaged, and then capped at
-  proxy_ceiling (0.75). The cap is what keeps Ring 4 out of reach for a
+  position, each scaled 0 to 1, averaged, and then capped at
+  proxy_ceiling (0.75). Position is scored by distance from the viewing
+  spot (proxy_spot_x_m, proxy_spot_y_m), the place on the centre line
+  where the work is best seen: 1 within proxy_spot_full_m, 0 at
+  proxy_spot_zero_m or further, falling in a straight line between. The cap is what keeps Ring 4 out of reach for a
   lone visitor: Ring 4 needs a score above 0.8 and only relational
   evidence can supply it. There is no rule that mentions population.
 - effective occupancy n_eff: the headcount smoothed over about ten

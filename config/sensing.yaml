@@ -40,7 +40,10 @@ cohesion:
   blend_weight_by_n: [[1, 0.0], [2, 0.5], [3, 0.9], [4, 1.0]]  # weight on relational cohesion vs proxy, by smoothed headcount
   proxy_ceiling: 0.75     # the proxy score can never exceed this; ring_up[3] is above it on purpose
   proxy_dwell_full_s: 120 # dwell counts as full after this long in the room
-  proxy_near_wall_m: 1.5  # closer than this to a wall counts as full proximity
+  proxy_spot_x_m: 6.0     # viewing spot, metres along the data wall (centre line)
+  proxy_spot_y_m: 3.5     # viewing spot, metres out from the data wall into the U
+  proxy_spot_full_m: 1.0  # within this distance of the viewing spot, position scores full
+  proxy_spot_zero_m: 4.0  # at this distance or further from the viewing spot, position scores zero
   rise_rate_per_s: 0.02   # how fast the reservoir rises toward a higher score
   fall_rate_per_s: 0.01   # how fast it falls toward a lower score
   ring_up:   [0.2, 0.4, 0.6, 0.8]   # reservoir level needed to reach ring 1, 2, 3, 4
