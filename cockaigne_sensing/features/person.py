@@ -70,7 +70,11 @@ class PersonScorer:
         """Bring this person's remembered history up to date."""
         dt = max(0.0, t - st.last_seen) if st.last_seen else 0.0
         st.last_seen = t
-        st.path.append((t, p["x"], p["y"]))
+        # Positions for straightness are sampled sparsely. At the full message
+        # rate, centimetre jitter summed to metres of phantom walking and a
+        # person standing still read as bored.
+        if not st.path or t - st.path[-1][0] >= self.cfg["straightness_sample_s"]:
+            st.path.append((t, p["x"], p["y"]))
         st.path = [h for h in st.path if t - h[0] <= self.cfg["straightness_window_s"]]
         if st.v_prev is not None:
             t0, vx0, vy0 = st.v_prev

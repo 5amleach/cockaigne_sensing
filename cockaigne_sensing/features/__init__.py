@@ -5,11 +5,13 @@ pictures, nothing that needs a GPU.
 
 Crowd, about once a second (crowd.py): clustering, synchrony and stillness
 combine by geometric mean into relational cohesion C. A proxy score A (time
-in the room, stillness, distance from the viewing spot, capped at
-proxy_ceiling) stands in when the room is nearly empty. The two blend by a
-weight that follows the smoothed headcount: S = (1 - w) A + w C. There is no
-solo mode; the blend is the single-viewer behaviour settled in DECISIONS.md
-(2026-09-19). The smoothed score feeds a reservoir that rises slowly, falls
+in the room, stillness, distance from the viewing spot) stands in when the
+room is nearly empty. The two blend by a weight that follows the smoothed
+headcount: S = (1 - w) A + w C, with C counting as zero below two people,
+and the blend held under a headcount-following ceiling (0.72 for one or two
+people) so the top ring stays collective. There is no solo mode; the blend
+is the single-viewer behaviour settled in DECISIONS.md (2026-09-19, guards
+2026-10-05). The smoothed score feeds a reservoir that rises slowly, falls
 more slowly, and is never reset; the reservoir level picks the ring, with a
 higher bar going up than coming down. Output is Contract 2.
 

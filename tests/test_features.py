@@ -44,8 +44,8 @@ def test_lone_viewer_is_capped_below_ring_4():
     # a lone visitor can possibly do. They reach Ring 3 and never Ring 4.
     stage = FeatureStage(load())
     crowds = run_room(stage, lambda t: [person(1, *SPOT, age=t)], t1=600.0)
-    assert all(c["cohesion_raw"] <= 0.75 + 1e-9 for c in crowds)
-    assert all(c["accumulator"] <= 0.75 + 1e-9 for c in crowds)
+    assert all(c["cohesion_raw"] <= 0.72 + 1e-9 for c in crowds)
+    assert all(c["accumulator"] <= 0.72 + 1e-9 for c in crowds)
     assert all(c["ring_target"] <= 3 for c in crowds)
     assert crowds[-1]["ring_target"] == 3  # the proxies do carry them up
 
@@ -57,6 +57,43 @@ def test_group_can_reach_ring_4():
              for i in range(4)]
     crowds = run_room(stage, lambda t: group, t1=300.0)
     assert crowds[-1]["ring_target"] == 4
+
+
+def test_two_people_never_pass_ring_3():
+    # A close, still pair for ten minutes: strong by every signal, but a dyad
+    # is weak relational evidence, so the ceiling holds them at Ring 3.
+    stage = FeatureStage(load())
+    pair = lambda t: [person(1, 2.85, 3.5, age=300 + t), person(2, 3.25, 3.5, age=300 + t)]
+    crowds = run_room(stage, pair, t1=600.0)
+    assert all(c["ring_target"] <= 3 for c in crowds)
+    assert all(c["accumulator"] <= 0.72 + 1e-9 for c in crowds)
+    assert crowds[-1]["ring_target"] == 3
+
+
+def test_ring_4_falls_within_a_minute_of_dropping_to_two():
+    stage = FeatureStage(load())
+    six = [person(i, SPOT[0] + 0.4 * math.cos(i), SPOT[1] + 0.4 * math.sin(i), age=300)
+           for i in range(6)]
+    crowds = run_room(stage, lambda t: six, t1=60.0)
+    assert crowds[-1]["ring_target"] == 4
+    crowds = run_room(stage, lambda t: six[:2], t0=60.5, t1=120.5)
+    assert crowds[-1]["ring_target"] == 3
+    # ...and two people cannot climb back up.
+    crowds = run_room(stage, lambda t: six[:2], t0=121.0, t1=600.0)
+    assert all(c["ring_target"] <= 3 for c in crowds)
+
+
+def test_lone_arrival_after_a_crowd_never_rises_past_ring_3():
+    # The crowd walks out at the moment one person walks in. The smoothed
+    # headcount lags, but the newcomer must not inherit the crowd's blend
+    # weight and ride a relational score of 1.0 to the top ring.
+    stage = FeatureStage(load())
+    six = [person(i, SPOT[0] + 0.4 * math.cos(i), SPOT[1] + 0.4 * math.sin(i), age=300)
+           for i in range(6)]
+    crowds = run_room(stage, lambda t: six, t1=35.0)
+    assert max(c["ring_target"] for c in crowds) == 3  # high, not yet at the top
+    crowds = run_room(stage, lambda t: [person(9, *SPOT, age=t - 35.0)], t0=35.5, t1=240.0)
+    assert all(c["ring_target"] <= 3 for c in crowds)
 
 
 def test_reservoir_is_continuous_when_occupancy_changes():
@@ -153,6 +190,21 @@ def test_mood_label_holds_for_the_dwell_time():
     assert labels[0.0] == "happy"
     assert labels[7.5] == "happy"   # slumped, but the dwell holds the label
     assert labels[14.0] == "sad"    # dwell elapsed, label follows
+
+
+def test_still_person_with_jitter_keeps_straightness_1():
+    # Three centimetres of position jitter must not add up to a walked path:
+    # a person standing still on the spot is not "bored".
+    import random
+    cfg = load()
+    scorer = PersonScorer(cfg)
+    rng = random.Random(1)
+    for i in range(601):  # 60 s at 10 Hz
+        t = i * 0.1
+        p = person(1, SPOT[0] + rng.uniform(-0.03, 0.03),
+                   SPOT[1] + rng.uniform(-0.03, 0.03), age=t)
+        scorer.update(msg(t, [p]))
+    assert scorer._straightness(scorer.states[1]) == 1.0
 
 
 def test_run_entry_point_writes_both_streams(tmp_path):

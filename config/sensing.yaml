@@ -45,7 +45,7 @@ cohesion:
   crowd_interval_s: 1.0   # how often the crowd state message is emitted
   occupancy_window_s: 10.0   # headcount is smoothed over this before it is used for blending
   blend_weight_by_n: [[1, 0.0], [2, 0.5], [3, 0.9], [4, 1.0]]  # weight on relational cohesion vs proxy, by smoothed headcount
-  proxy_ceiling: 0.75     # the proxy score can never exceed this; ring_up[3] is above it on purpose
+  score_ceiling_by_n: [[1, 0.72], [2, 0.72], [3, 0.9], [4, 1.0]]  # ceiling on the blended score by smoothed headcount; one or two people top out below ring 4
   proxy_dwell_full_s: 120 # dwell counts as full after this long in the room
   proxy_spot_x_m: 3.05    # viewing spot, metres along the data wall (centre line of a 6.1 m floor)
   proxy_spot_y_m: 3.5     # viewing spot, metres out from the data wall into the U
@@ -54,7 +54,7 @@ cohesion:
   rise_rate_per_s: 0.02   # how fast the reservoir rises toward a higher score
   fall_rate_per_s: 0.01   # how fast it falls toward a lower score
   ring_up:   [0.2, 0.4, 0.6, 0.8]   # reservoir level needed to reach ring 1, 2, 3, 4
-  ring_down: [0.1, 0.3, 0.5, 0.7]   # level below which the ring drops to 0, 1, 2, 3
+  ring_down: [0.1, 0.3, 0.5, 0.74]  # level below which the ring drops to 0, 1, 2, 3; 0.74 sits above the one-or-two-person ceiling
 
 mood:
   # Everything in this section is a starting guess, to be tuned on site against
@@ -69,6 +69,7 @@ mood:
   valence_slump_scale: 0.3     # slump this far beyond neutral costs one whole unit of valence
   valence_jerk_scale: 3.0      # movement roughness (metres per second squared) that costs one unit of valence
   straightness_window_s: 30.0  # path straightness is judged over this window
+  straightness_sample_s: 1.0   # positions for straightness are sampled this often, so jitter does not read as walking
   straightness_min_path_m: 1.0 # with less walking than this, straightness is not judged at all
   bored_straightness: 0.4 # wandering below this straightness, while calm, reads as bored
   bored_arousal_max: 0.4  # ...and only while arousal is below this

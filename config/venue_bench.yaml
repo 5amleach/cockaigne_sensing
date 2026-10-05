@@ -44,7 +44,7 @@ cohesion:
     - 0.9
   - - 4
     - 1.0
-  proxy_ceiling: 0.75
+  score_ceiling_by_n: [[1, 0.72], [2, 0.72], [3, 0.9], [4, 1.0]]
   proxy_dwell_full_s: 120
   proxy_spot_x_m: 3.05
   proxy_spot_y_m: 3.5
@@ -61,7 +61,7 @@ cohesion:
   - 0.1
   - 0.3
   - 0.5
-  - 0.7
+  - 0.74
 mood:
   # Everything in this section is a starting guess, to be tuned on site against
   # footage from the final camera height. Treat the labels as provisional until then.
@@ -75,6 +75,7 @@ mood:
   valence_slump_scale: 0.3     # slump this far beyond neutral costs one whole unit of valence
   valence_jerk_scale: 3.0      # movement roughness (metres per second squared) that costs one unit of valence
   straightness_window_s: 30.0  # path straightness is judged over this window
+  straightness_sample_s: 1.0   # positions for straightness are sampled this often, so jitter does not read as walking
   straightness_min_path_m: 1.0 # with less walking than this, straightness is not judged at all
   bored_straightness: 0.4 # wandering below this straightness, while calm, reads as bored
   bored_arousal_max: 0.4  # ...and only while arousal is below this

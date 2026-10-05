@@ -12,12 +12,17 @@ relational cohesion C, so a low score on either pulls the whole down.
 
 When there is nobody to be relational with, a proxy score A stands in, built
 from each person's time in the room, their stillness, and their distance from
-the viewing spot. A is capped at proxy_ceiling so the top ring always needs
-relational evidence.
+the viewing spot.
 
 The two are blended, never switched: S = (1 - w) A + w C, where the weight w
 follows the smoothed headcount. This is the settled single-viewer behaviour
-(DECISIONS.md, 2026-09-19).
+(DECISIONS.md, 2026-09-19). Two guards keep the top ring collective
+(DECISIONS.md, 2026-10-05). In the blend, C counts as 0.0 whenever fewer
+than two people are present, so a lone person cannot inherit a departed
+crowd's weight; the reported cohesion_relational still says 1.0 for one
+person, because that is the displayed claim, not the driver. And the blended
+score is held under a ceiling that follows the smoothed headcount, 0.72 for
+one or two people, because a dyad is weak relational evidence.
 
 The smoothed score feeds a reservoir, a level that rises slowly while the
 score sits above it and drains more slowly while the score sits below. The
@@ -123,9 +128,9 @@ def proxy_score(people: list[dict], cohesion_cfg: dict) -> float:
 
     For each person: time in the room (full after proxy_dwell_full_s),
     stillness (1 when stopped) and position (spot_score), averaged. The
-    per-person scores are averaged over everyone present and capped at
-    proxy_ceiling, which is what keeps Ring 4 out of reach without
-    relational evidence.
+    per-person scores are averaged over everyone present. The ceiling that
+    keeps the top ring out of reach is applied to the blended score, not
+    here (score_ceiling_by_n).
     """
     if not people:
         return 0.0
@@ -135,14 +140,13 @@ def proxy_score(people: list[dict], cohesion_cfg: dict) -> float:
         still = 1.0 if _speed(p) < cohesion_cfg["still_speed_mps"] else 0.0
         position = spot_score(p["x"], p["y"], cohesion_cfg)
         per_person.append((dwell + still + position) / 3.0)
-    return min(sum(per_person) / len(per_person), cohesion_cfg["proxy_ceiling"])
+    return sum(per_person) / len(per_person)
 
 
-def blend_weight(n_eff: float, table: list[list[float]]) -> float:
-    """The weight on relational cohesion, read from [[headcount, weight], ...].
-
-    Piecewise linear between the table's points; flat beyond its ends.
-    """
+def interp_by_n(n_eff: float, table: list[list[float]]) -> float:
+    """A value that follows the smoothed headcount, read from
+    [[headcount, value], ...]: piecewise linear between the table's points,
+    flat beyond its ends. Used for the blend weight and the score ceiling."""
     if n_eff <= table[0][0]:
         return table[0][1]
     for (n0, w0), (n1, w1) in zip(table, table[1:]):
@@ -243,8 +247,13 @@ class CrowdState:
             relational = 1.0 if n == 1 else relational_cohesion(signals, c["signals"])
 
         proxy = proxy_score(people, c)
-        w = blend_weight(self.n_eff, c["blend_weight_by_n"])
-        raw = (1.0 - w) * proxy + w * relational
+        w = interp_by_n(self.n_eff, c["blend_weight_by_n"])
+        # In the blend, relational evidence needs at least two people; the
+        # reported cohesion_relational above keeps saying 1.0 for one.
+        raw = (1.0 - w) * proxy + w * (relational if n >= 2 else 0.0)
+        # The ceiling that keeps the top ring collective: 0.72 for one or two
+        # people, out of the way from four up.
+        raw = min(raw, interp_by_n(self.n_eff, c["score_ceiling_by_n"]))
 
         self.smooth += _alpha(dt, c["smooth_window_s"]) * (raw - self.smooth)
         level = self.reservoir.step(self.smooth, dt)
