@@ -29,3 +29,7 @@ You are one of several assistants (Claude Code, Codex, and others) building this
 ## Style of comments and docs
 
 Full sentences. One idea per sentence. Explain a technical term the first time it appears. Assume an intelligent reader who is not a programmer.
+
+## Size budget
+
+The system stays small enough for one person to read in a sitting. No file over 300 lines. No module (one folder) over 1,000 lines. Both packages together stay under 5,000 lines of code, counting non-blank, non-comment lines and not counting `tests/` or documentation. A change that would break the budget is not made; it comes back as a question first, with what would have to be simplified or removed.

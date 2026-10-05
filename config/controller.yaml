@@ -11,6 +11,8 @@ resolume:
   video_layer: 1      # the layer holding the landscape clips
   audio_bank_a: [2, 3, 4, 5]   # four stem layers, bank A
   audio_bank_b: [6, 7, 8, 9]   # four stem layers, bank B; two banks so an arm change can crossfade
+  confirm_s: 2.0      # after a fire, confirm over REST within this long that the right clip connected
+  confirm_poll_s: 0.5 # how often to look while confirming
 
 clock:
   clip_s: 60.0        # every clip is this long; the controller fires the next on its own clock
@@ -26,10 +28,12 @@ controller:
   arm_chooser: bandit      # "bandit" live; "fixed" pins default_arm, for tests and soaking one arm on site
   default_arm: machinery   # the arm used when arm_chooser is fixed
   tick_s: 0.1              # how often the loop checks its clock
+  blind_after_s: 30        # no crowd message for this long: run blind, stepping the ring down each cycle
+  reconnect_s: 5           # how often to retry the bus when the connection is down
+  log_path: controller.log # log lines go here as well as to the terminal
 
 occupancy:
-  smooth_window_s: 10.0    # the controller smooths the headcount itself; Contract 2 carries only n
-  bands: [[1, solo], [2, small], [6, medium], [16, large]]  # lower edge of each band, by smoothed headcount
+  bands: [[1, solo], [2, small], [6, medium], [16, large]]  # lower edge of each band, by n_smooth from the crowd state
   band_size: {solo: 1, small: 3, medium: 10, large: 20}     # a typical headcount per band; divides the action bias
 
 bandit:

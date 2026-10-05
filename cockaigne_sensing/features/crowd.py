@@ -1,33 +1,28 @@
 """Crowd cohesion, the reservoir and the ring, from the people list alone.
 
-This file is the arithmetic behind Contract 2. It has no models and no camera
-knowledge; its only input is the people list (Contract 1).
+The arithmetic behind Contract 2: no models, no camera knowledge, only the
+people list (Contract 1) in.
 
 Three raw signals say how much the crowd is acting as a group: clustering
 (gathered more than chance would place them), synchrony (moving the same way)
 and stillness (stopped at the same time). Synchrony and stillness fold into
-one signal, coordination, because a still crowd and a marching crowd are both
-acting together. The geometric mean of clustering and coordination is
-relational cohesion C, so a low score on either pulls the whole down.
+one signal, coordination, since a still crowd and a marching crowd are both
+acting together; the geometric mean of clustering and coordination is
+relational cohesion C, so a low score on either pulls the whole down. When
+there is nobody to be relational with, a proxy score A stands in, built from
+each person's time in the room, stillness, and distance from the viewing spot.
 
-When there is nobody to be relational with, a proxy score A stands in, built
-from each person's time in the room, their stillness, and their distance from
-the viewing spot.
+The two are blended, never switched: S = (1 - w) A + w C, with the weight w
+following the smoothed headcount (the single-viewer behaviour, DECISIONS.md
+2026-09-19). Two guards keep the top ring collective (2026-10-05): in the
+blend C counts as 0.0 below two people, so a lone person cannot inherit a
+departed crowd's weight (the reported cohesion_relational still says 1.0 for
+one person: the displayed claim, not the driver), and the blend sits under a
+headcount-following ceiling, 0.72 up to two people: a dyad is weak evidence.
 
-The two are blended, never switched: S = (1 - w) A + w C, where the weight w
-follows the smoothed headcount. This is the settled single-viewer behaviour
-(DECISIONS.md, 2026-09-19). Two guards keep the top ring collective
-(DECISIONS.md, 2026-10-05). In the blend, C counts as 0.0 whenever fewer
-than two people are present, so a lone person cannot inherit a departed
-crowd's weight; the reported cohesion_relational still says 1.0 for one
-person, because that is the displayed claim, not the driver. And the blended
-score is held under a ceiling that follows the smoothed headcount, 0.72 for
-one or two people, because a dyad is weak relational evidence.
-
-The smoothed score feeds a reservoir, a level that rises slowly while the
-score sits above it and drains more slowly while the score sits below. The
-reservoir level picks the ring, with a higher bar for going up than for coming
-down so the wall does not flicker at a boundary. The reservoir is never reset.
+The smoothed score feeds a reservoir that rises slowly and drains more slowly;
+its level picks the ring, with a higher bar going up than coming down so the
+wall does not flicker at a boundary. The reservoir is never reset.
 """
 from __future__ import annotations
 
@@ -97,13 +92,10 @@ def stillness_score(people: list[dict], still_speed: float) -> float:
 
 
 def coordination_score(stillness: float, synchrony: float) -> float:
-    """Stillness and synchrony folded into one signal.
-
-    Everyone still scores 1; everyone moving the same way scores 1; half still
-    and half moving at random scores about 0.5. They began as two separate
-    signals, but the geometric mean punished a still crowd for not marching
-    and a marching crowd for not standing still (DECISIONS.md, 2026-10-05).
-    """
+    """Stillness and synchrony folded into one signal: everyone still scores
+    1, everyone moving the same way scores 1, half still and half moving at
+    random about 0.5. As separate signals the geometric mean punished a still
+    crowd for not marching and vice versa (DECISIONS.md, 2026-10-05)."""
     return stillness + (1.0 - stillness) * synchrony
 
 
@@ -293,6 +285,7 @@ class CrowdState:
             rates[action] = round(r["current"] / max(r["baseline"], ac["baseline_floor"]), 2)
         return {
             "stream": "crowd", "t": round(t, 3), "n": n,
+            "n_smooth": round(self.n_eff, 2),
             "clustering": round(signals["clustering"], 3),
             "synchrony": round(signals["synchrony"], 3),
             "stillness": round(signals["stillness"], 3),

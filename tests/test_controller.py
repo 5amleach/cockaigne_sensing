@@ -14,12 +14,17 @@ ARMS = {"a": "architecture", "u": "furniture", "s": "storm", "r": "rivers",
 
 def full_pool():
     """A made-up clip pool that satisfies the map: Barren in and out of every
-    arm, ring chains up and down, collapses, Ring 4 loops, a Barren loop."""
+    arm, ring chains up and down, same-ring laterals both ways around,
+    collapses, Ring 4 loops, a Barren loop."""
     names = ["b_b"]
-    for a in ARMS:
+    letters = list(ARMS)
+    for i, a in enumerate(letters):
         names += [f"b_{a}1", f"{a}1b", f"{a}4{a}4", f"{a}2b", f"{a}3b"]
         for r in (1, 2, 3):
             names += [f"{a}{r}{a}{r + 1}", f"{a}{r + 1}{a}{r}"]
+        nxt = letters[(i + 1) % len(letters)]
+        for r in (1, 2, 3):
+            names += [f"{a}{r}{nxt}{r}", f"{nxt}{r}{a}{r}"]
     return names
 
 
@@ -35,7 +40,7 @@ def make_controller(pool=None, **cfg_over):
 
 def crowd(t, ring, n=3, cohesion=0.5):
     return {"stream": "crowd", "t": t, "ring_target": ring, "n": n,
-            "cohesion_smooth": cohesion}
+            "n_smooth": n, "cohesion_smooth": cohesion}
 
 
 def test_clip_names_parse_by_the_rule():
@@ -53,9 +58,9 @@ def test_map_reports_what_is_missing():
     problems = ClipMap(pool, ARMS).missing()
     assert any("loop clip for m4" in p for p in problems)
     assert any("f2 to b" in p for p in problems)
-    # An arm with no way in at all shows up as unroutable.
-    pool = [n for n in full_pool() if not n.startswith("b_c") and n != "cb"]
-    pool.remove("c1b")
+    # A node nothing leads into shows up as unroutable.
+    pool = [n for n in full_pool()
+            if (parse_clip_name(n, ARMS, 4) or ("", ""))[1] != "c1"]
     problems = ClipMap(pool, ARMS).missing()
     assert any("no route" in p and "c1" in p for p in problems)
 
@@ -70,46 +75,77 @@ def test_shortest_path_steps_through_existing_clips():
 
 def test_ring_only_loop_climbs_and_collapses():
     c = make_controller(default_arm="machinery")
-    c.observe(crowd(1.0, 1))
+    c.observe(crowd(59.0, 1))
     d, _ = c.decide(60.0)
     assert (d["from"], d["to"], d["reason"]) == ("b", "m1", "ring")
-    c.observe(crowd(61.0, 3))
+    c.observe(crowd(119.0, 3))
     d, _ = c.decide(120.0)
     assert (d["to"], d["reason"]) == ("m2", "path")   # no m1 -> m3 clip: step
+    c.observe(crowd(179.0, 3))
     d, _ = c.decide(180.0)
     assert (d["to"], d["reason"]) == ("m3", "ring")
-    c.observe(crowd(181.0, 0))
+    c.observe(crowd(239.0, 0))
     d, _ = c.decide(240.0)
     assert (d["to"], d["clip"], d["arm"]) == ("b", "m3b", "barren")  # direct collapse
 
 
-def test_staying_put_loops_or_probes():
+def climb_to(c, ring, t0=60.0):
+    """Walk the controller to machinery at this ring, fresh crowd each cycle.
+    Returns at the moment of arrival, before any staying-put decision."""
+    goal = "b" if ring == 0 else f"m{ring}"
+    t = t0
+    for _ in range(12):
+        c.observe(crowd(t - 1.0, ring))
+        d, _ = c.decide(t)
+        t += 60.0
+        if d["to"] == goal:
+            return d, t
+    raise AssertionError(f"never reached {goal}")
+
+
+def test_staying_put_loops_probes_or_moves_sideways():
+    # Barren with a loop clip loops.
     c = make_controller()
-    c.observe(crowd(1.0, 0))
+    c.observe(crowd(59.0, 0))
     d, _ = c.decide(60.0)
     assert (d["to"], d["reason"], d["clip"]) == ("b", "loop", "b_b")
     # Without a Barren loop clip, Barren probes out to Ring 1 and returns.
     c = make_controller(pool=[n for n in full_pool() if n != "b_b"])
-    c.observe(crowd(1.0, 0))
+    c.observe(crowd(59.0, 0))
     d, _ = c.decide(60.0)
     assert (d["to"], d["reason"]) == ("m1", "probe")
+    c.observe(crowd(119.0, 0))
     d, _ = c.decide(120.0)
     assert (d["to"], d["reason"]) == ("b", "ring")
-    # A mid-ring node with no loop bounces to its downward neighbour.
+    # Holding Ring 3 is a sideways move: same ring, another arm, and back.
     c = make_controller()
-    c.observe(crowd(1.0, 3))
-    for t in (60.0, 120.0, 180.0):
-        c.decide(t)                       # b -> m1 -> m2 -> m3
-    d, _ = c.decide(240.0)
-    assert (d["from"], d["to"], d["reason"]) == ("m3", "m2", "probe")
-    d, _ = c.decide(300.0)
-    assert (d["to"], d["reason"]) == ("m3", "ring")
+    _, t = climb_to(c, 3)
+    c.observe(crowd(t - 1.0, 3))
+    d, _ = c.decide(t)
+    assert d["reason"] == "lateral"
+    assert d["from"] == "m3" and d["to"].endswith("3") and d["to"] != "m3"
+    c.observe(crowd(t + 59.0, 3))
+    d, _ = c.decide(t + 60.0)
+    assert (d["to"], d["reason"]) == ("m3", "ring")   # the fixed arm pulls it home
     # Ring 4 has a loop and uses it.
     c = make_controller()
-    c.observe(crowd(1.0, 4))
-    for t in (60.0, 120.0, 180.0, 240.0, 300.0):
-        d, _ = c.decide(t)
+    _, t = climb_to(c, 4)
+    c.observe(crowd(t - 1.0, 4))
+    d, _ = c.decide(t)
     assert (d["from"], d["to"], d["reason"]) == ("m4", "m4", "loop")
+
+
+def test_blind_controller_steps_down_to_barren():
+    c = make_controller()
+    climb_to(c, 3)
+    last = c.last_crowd
+    walk = []
+    for i in range(4):          # sensing has gone quiet; the clock keeps going
+        t = last + 60.0 * (i + 1)
+        assert c.is_blind(t)
+        d, _ = c.decide(t)
+        walk.append((d["to"], d["ring_target"]))
+    assert walk == [("m2", 2), ("m1", 1), ("b", 0), ("b", 0)]
 
 
 def test_clock_fires_audio_lead_then_clip():
@@ -122,11 +158,10 @@ def test_clock_fires_audio_lead_then_clip():
     assert clock.clip_due(160.0)
 
 
-def test_occupancy_context_bands():
+def test_occupancy_context_comes_from_n_smooth():
     c = make_controller()
     assert c.context() == "solo"
-    for i in range(300):
-        c.observe(crowd(i * 1.0, 2, n=8))
+    c.observe(crowd(1.0, 2, n=8))     # features did the smoothing already
     assert c.context() == "medium"
 
 
@@ -161,6 +196,51 @@ def test_osc_loopback_against_the_fake():
     volume = next(args for addr, args in fake.received
                   if addr == "/composition/layers/3/audio/volume")
     assert volume[0] == pytest.approx(0.8)  # OSC carries 32-bit floats
+
+
+def test_connected_clip_is_read_from_the_layer_json():
+    from cockaigne_controller.resolume import connected_from_layer
+    data = {"clips": [{"connected": {"value": "Disconnected"}},
+                      {"connected": {"value": "Connected"}},
+                      {"connected": False}]}
+    assert connected_from_layer(data) == 2
+    assert connected_from_layer({"clips": [{"connected": True}]}) == 1
+    assert connected_from_layer({"clips": []}) is None
+
+
+def test_fire_is_confirmed_retried_once_and_never_raises():
+    import asyncio
+    import logging
+    from cockaigne_controller.run import fire_confirmed
+    log = logging.getLogger("test_fire")
+
+    class WrongUntilRefired:
+        def __init__(self):
+            self.fires = 0
+        def fire_clip(self, layer, index):
+            self.fires += 1
+        def connected_clip(self, layer):
+            return 3 if self.fires >= 2 else 5   # right only after the retry
+
+    stub = WrongUntilRefired()
+    asyncio.run(fire_confirmed(stub, 1, 3, log, confirm_s=0.1, poll_s=0.02))
+    assert stub.fires == 2
+
+    class NoRest(WrongUntilRefired):
+        def connected_clip(self, layer):
+            raise OSError("connection refused")
+
+    dead = NoRest()
+    asyncio.run(fire_confirmed(dead, 1, 3, log, confirm_s=0.1, poll_s=0.02))
+    assert dead.fires == 1   # nothing to confirm against: no retry, no crash
+
+    class AlwaysWrong(WrongUntilRefired):
+        def connected_clip(self, layer):
+            return 7
+
+    wrong = AlwaysWrong()
+    asyncio.run(fire_confirmed(wrong, 1, 3, log, confirm_s=0.1, poll_s=0.02))
+    assert wrong.fires == 2  # one retry, then carry on
 
 
 def test_controller_refuses_a_holey_pool():

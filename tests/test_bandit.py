@@ -140,7 +140,7 @@ def test_reward_flows_from_cohesion_into_the_belief():
     layout = {n: (1, i) for i, n in enumerate(names, start=1)}
     c = Controller(cfg, ClipMap(names, ARM_LETTERS), layout, rng=_r.Random(5))
     c.ensure_day(datetime.date(2026, 1, 15))
-    c.observe(crowd_msg(1.0, 2, cohesion=0.40))
+    c.observe(crowd_msg(59.0, 2, cohesion=0.40))
     d, _ = c.decide(60.0)                 # the bandit picks some arm
     assert d["personality"] is not None
     c.fired(60.0)

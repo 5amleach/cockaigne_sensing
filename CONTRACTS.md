@@ -44,7 +44,7 @@ All times are seconds as a float. Live, `t` is `time.monotonic()` on the sensing
 `features` → `bus` → controller and data wall. About once a second.
 
 ```json
-{"t": 12.40, "n": 9,
+{"t": 12.40, "n": 9, "n_smooth": 8.3,
  "clustering": 0.71, "synchrony": 0.44, "stillness": 0.33, "coordination": 0.62,
  "cohesion_relational": 0.66, "cohesion_raw": 0.66, "cohesion_smooth": 0.52,
  "accumulator": 0.63, "ring_target": 2,
@@ -53,19 +53,23 @@ All times are seconds as a float. Live, `t` is `time.monotonic()` on the sensing
  "action_rates": {"phone": 1.4, "drink": 0.0, "eat": 0.0}}
 ```
 
-- `n` is the headcount.
+- `n` is the headcount. `n_smooth` is the headcount smoothed over about ten seconds; it is computed here and nowhere else, and the controller reads it for its occupancy bands.
 - The signal values run 0 to 1. `coordination` is stillness and synchrony folded into one: `stillness + (1 - stillness) * synchrony`. `cohesion_relational` is the geometric mean of clustering and coordination (1.0 for one person, 0.0 for an empty room); it is the number the data wall displays as the Coherence Index. `cohesion_raw` is the blend of the proxy score and `cohesion_relational`, and it is what drives the ring. `cohesion_smooth` is its ten-second weighted average. `accumulator` is the reservoir level, 0 to 1. `ring_target` is 0 (Barren) to 4.
 - `moods` and `actions` are counts of people. `action_rates` are each action's current rate divided by its running baseline, so 1.0 means normal and 3.0 means three times the usual amount. The controller uses `action_rates`, not counts, to bias the arm choice.
 
 ## Contract 3 — clip decision
 
-Controller → Resolume bridge and data wall. Owned by the controller repo, reproduced here so the data wall has one place to look.
+Controller → bus → data wall. Owned by the controller package (`cockaigne_controller/BRIEF.md`); updated 5 October 2026 to match what is published.
 
 ```json
-{"t": 12.40, "from": "barren", "to": "m1",
- "clip": "b_m1", "resolume_index": 47, "arm": "machinery",
- "reason": "action_bias", "context": "occ_6_15"}
+{"stream": "decision", "t": 12.4, "from": "b", "to": "m1", "clip": "b_m1",
+ "resolume_index": 47, "arm": "machinery", "reason": "action_bias",
+ "context": "small", "personality": "Operator", "ring_target": 1}
 ```
+
+- `from` and `to` are nodes: `b` (Barren) or an arm letter plus a ring number.
+- `context` is the occupancy band: `solo`, `small`, `medium` or `large`.
+- `reason` is one of `ring`, `bandit`, `action_bias`, `path` (an intermediate step), `loop`, `probe`, `lateral` (holding a ring by moving sideways to another arm).
 
 ## Ledger entries
 

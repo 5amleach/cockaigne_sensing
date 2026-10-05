@@ -28,6 +28,21 @@ def layout_from_composition(data: dict) -> dict[str, tuple[int, int]]:
     return layout
 
 
+def connected_from_layer(data: dict) -> int | None:
+    """The 1-based index of the connected clip in one layer's JSON, or None.
+
+    Resolume reports connection as a parameter whose value is a boolean or
+    a string beginning "Connected"; both readings are accepted."""
+    for i, clip in enumerate(data.get("clips", []), start=1):
+        value = clip.get("connected")
+        if isinstance(value, dict):
+            value = value.get("value")
+        if value is True or (isinstance(value, str)
+                             and value.lower().startswith("connected")):
+            return i
+    return None
+
+
 class Resolume:
     """One OSC client and one REST endpoint, both local."""
 
@@ -41,6 +56,13 @@ class Resolume:
                          timeout=5)
         r.raise_for_status()
         return layout_from_composition(r.json())
+
+    def connected_clip(self, layer: int) -> int | None:
+        """Which clip the layer reports as connected, 1-based, over REST."""
+        r = requests.get(f"http://{self.host}:{self.rest_port}/api/v1/composition"
+                         f"/layers/{layer}", timeout=1)
+        r.raise_for_status()
+        return connected_from_layer(r.json())
 
     def fire_clip(self, layer: int, index: int) -> None:
         self._osc.send_message(f"/composition/layers/{layer}/clips/{index}/connect", 1)

@@ -52,14 +52,22 @@ class Bandit:
         self.beliefs = {(ctx, arm): Beta(*priors[arm])
                         for ctx in self.contexts for arm in self.arms}
 
-    def choose(self, context: str, bias: dict[str, float]) -> tuple[str, str]:
-        """One Thompson draw plus the lean. Returns (arm, reason), the reason
-        being "action_bias" only when the lean changed the winner."""
+    def rank(self, context: str, bias: dict[str, float]) -> tuple[list[str], str]:
+        """One Thompson draw plus the lean, every arm in order of its total.
+        The reason is "action_bias" only when the lean changed the winner;
+        the runner-up serves the lateral move when the winner is the arm
+        the wall is already on."""
         draws = {arm: self.beliefs[(context, arm)].sample(self.rng)
                  for arm in self.arms}
         plain = max(draws, key=draws.get)
-        biased = max(draws, key=lambda arm: draws[arm] + bias.get(arm, 0.0))
-        return biased, ("action_bias" if biased != plain else "bandit")
+        order = sorted(self.arms, key=lambda arm: draws[arm] + bias.get(arm, 0.0),
+                       reverse=True)
+        return order, ("action_bias" if order[0] != plain else "bandit")
+
+    def choose(self, context: str, bias: dict[str, float]) -> tuple[str, str]:
+        """The winning arm alone, when the full ranking is not needed."""
+        order, reason = self.rank(context, bias)
+        return order[0], reason
 
     def update(self, context: str, arm: str, reward: float) -> None:
         self.beliefs[(context, arm)].update(reward)
