@@ -2,8 +2,14 @@
 
 Contains the recorder (writes messages to a .jsonl file, development only),
 the replayer (reads such a file back at its original pace), the WebSocket
-publisher (not yet written) and the ledger (not yet written).
+publisher (publish.py; binds to the local machine only, enforced in code)
+and the ledger (ledger.py; append-only, never wiped).
+
+Serve a recording live:
+    python -m cockaigne_sensing.bus.run recording.jsonl
 """
+from .ledger import Ledger, LedgerEvents
+from .publish import Publisher
 from .record import Recorder, replay
 
-__all__ = ["Recorder", "replay"]
+__all__ = ["Ledger", "LedgerEvents", "Publisher", "Recorder", "replay"]
