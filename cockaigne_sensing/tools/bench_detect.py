@@ -48,7 +48,8 @@ def main() -> None:
     out.mkdir(parents=True, exist_ok=True)
     src = FrameSource(args.clip, name=args.camera)
     src.every_nth = max(1, round(src.fps / args.fps))  # the file's own rate decides the stride
-    tracker = PersonTracker(model, imgsz, cfg["conf"], cfg["tracker"], device, cfg["min_track_age_s"])
+    tracker = PersonTracker(model, imgsz, cfg["conf"], cfg["tracker"], device,
+                            cfg["min_track_age_s"], cfg["forget_after_s"])
     rec = Recorder(out / "tracks.jsonl")
 
     life: dict[int, list[float]] = defaultdict(list)
@@ -77,7 +78,8 @@ def main() -> None:
                             cv2.FONT_HERSHEY_SIMPLEX, 0.9, (255, 128, 0), 2)
             h = 720
             ann = cv2.resize(ann, (int(ann.shape[1] * h / ann.shape[0]), h))
-            cv2.imwrite(str(out / f"snap_{sec:04d}s.jpg"), ann)
+            if not cv2.imwrite(str(out / f"snap_{sec:04d}s.jpg"), ann):
+                print(f"warning: could not save snap_{sec:04d}s.jpg")
             last_snap = t
     rec.close()
     src.close()

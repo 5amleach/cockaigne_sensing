@@ -32,13 +32,14 @@ class PersonTracker:
 
     def __init__(self, model: str = "yolo11s.pt", imgsz: int = 1280, conf: float = 0.25,
                  tracker: str = "bytetrack.yaml", device: str = "auto",
-                 min_track_age_s: float = 1.0):
+                 min_track_age_s: float = 1.0, forget_after_s: float = 5.0):
         self.model = YOLO(model)
         self.imgsz = imgsz
         self.conf = conf
         self.tracker = tracker
         self.device = None if device == "auto" else device
         self.min_track_age_s = min_track_age_s
+        self.forget_after_s = forget_after_s
         self._first_seen: dict[int, float] = {}
         self._last_seen: dict[int, float] = {}
 
@@ -62,7 +63,7 @@ class PersonTracker:
         # ByteTrack may hide an id for a few frames and bring it back, so the
         # age clock is kept for a few seconds rather than reset at once.
         for tid, last in list(self._last_seen.items()):
-            if t - last > 5.0:
+            if t - last > self.forget_after_s:
                 del self._last_seen[tid]
                 self._first_seen.pop(tid, None)
         return tracks

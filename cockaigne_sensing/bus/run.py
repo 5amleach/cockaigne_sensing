@@ -36,10 +36,12 @@ async def serve_recording(path: str, cfg: dict, record: str | None = None,
     recorder = Recorder(record) if record else None
     print(f"serving ws://{publisher.host}:{publisher.port} from {path}"
           + (" (looping)" if loop else ""))
+    served = 0
     try:
         while True:
             start = time.monotonic()
             t0 = None
+            passed = 0
             for msg in replay(path):
                 if t0 is None:
                     t0 = msg["t"]
@@ -50,7 +52,13 @@ async def serve_recording(path: str, cfg: dict, record: str | None = None,
                 await publisher.publish(msg)
                 if recorder:
                     recorder.write(msg)
+                passed += 1
+            served += passed
+            if passed == 0:
+                print(f"{path} holds no messages; stopping")
+                break
             if not loop:
+                print(f"recording finished; served {served} messages")
                 break
     finally:
         if recorder:

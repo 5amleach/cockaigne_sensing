@@ -38,11 +38,34 @@ def test_tracker_keeps_one_id_for_a_walker():
 
 def test_merge_collapses_two_cameras_views_of_one_person():
     tr = FloorTracker(merge_distance_m=0.5)
-    merged = tr.merge([Sighting(2.0, 2.0, 0.4, 500, 0.9), Sighting(2.2, 2.3, 0.4, 300, 0.8),
-                       Sighting(5.0, 5.0, 0.4, 400, 0.9)])
+    merged = tr.merge([Sighting(2.0, 2.0, 0.4, 500, 0.9, camera="c1"),
+                       Sighting(2.2, 2.3, 0.4, 300, 0.8, camera="c2"),
+                       Sighting(5.0, 5.0, 0.4, 400, 0.9, camera="c1")])
     assert len(merged) == 2
     lead = next(m for m in merged if m.x < 3)
     assert lead.box_h == 500 and abs(lead.x - 2.1) < 1e-9
+
+
+def test_two_people_close_together_in_one_camera_stay_two():
+    # The audit's case: 20 cm apart, one camera, boxes side by side.
+    tr = FloorTracker(merge_distance_m=0.5)
+    merged = tr.merge([Sighting(2.0, 2.0, 0.4, 500, 0.9, camera="c1", box=(100, 50, 200, 550)),
+                       Sighting(2.2, 2.0, 0.4, 490, 0.9, camera="c1", box=(210, 55, 310, 545))])
+    assert len(merged) == 2
+    # A duplicate detection of one person, heavily overlapping, still merges.
+    merged = tr.merge([Sighting(2.0, 2.0, 0.4, 500, 0.9, camera="c1", box=(100, 50, 200, 550)),
+                       Sighting(2.05, 2.0, 0.4, 480, 0.9, camera="c1", box=(105, 60, 205, 540))])
+    assert len(merged) == 1
+
+
+def test_a_long_absent_id_is_not_revived():
+    # The audit's case: seen at t=0, nothing for an hour, same spot again.
+    tr = FloorTracker(drop_after_s=3.0)
+    tr.update(0.0, [Sighting(1.0, 1.0, 0.4, 500, 0.9)])
+    people = tr.update(3600.0, [Sighting(1.0, 1.0, 0.4, 500, 0.9)])
+    assert len(people) == 1
+    assert people[0].id == 2                 # a new person, not the ghost
+    assert people[0].first_seen == 3600.0    # with a new age
 
 
 def test_tracker_coasts_then_goes_quiet_then_drops():
@@ -82,6 +105,28 @@ def test_stage_drops_feet_that_map_off_the_floor(tmp_path):
     ]}
     sightings = stage.sightings(msg)
     assert len(sightings) == 1 and abs(sightings[0].y - 4.0) < 0.05
+
+
+def test_calibration_scales_to_the_messages_frame_size(tmp_path):
+    # A 4K calibration used on a sub-stream: pixels are scaled by the ratio.
+    cam = Camera(3.05, 0.0, 3.0, 35.0, 0.0, "into_u", focal_from_hfov(3840, 87), 1920, 1080)
+    H = homography_from_camera(cam, W, L)
+    hpath = tmp_path / "h.json"
+    hpath.write_text(json.dumps({"H": H.tolist(), "image_size": [3840, 2160]}))
+    cfg = load()
+    cfg["floor"] = {"width_m": W, "length_m": L}
+    cfg["cameras"] = [{"name": "c", "homography": str(hpath), "floor_polygon": []}]
+    stage = FloorStage(cfg)
+    u, v = cam.project(np.array([[3.0, 6.0]]))[0]   # a real floor point, in 4K pixels
+    u, v = u * 640 / 3840, v * 360 / 2160           # ...seen in a 640x360 frame
+    msg = {"t": 1.0, "camera": "c", "w": 640, "h": 360,
+           "tracks": [{"id": 1, "box": [u - 10, v - 60, u + 10, v], "conf": 0.9}]}
+    sightings = stage.sightings(msg)
+    assert len(sightings) == 1
+    assert abs(sightings[0].x - 3.0) < 0.05 and abs(sightings[0].y - 6.0) < 0.05
+    # A different aspect means the wrong calibration: that camera is skipped.
+    msg["w"], msg["h"] = 640, 480
+    assert stage.sightings(msg) == []
 
 
 def test_venue_fixture_runs_through_the_stage():

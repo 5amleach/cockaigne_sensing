@@ -20,7 +20,7 @@ def crowd(t, n=4, sitting=0, **rates):
 
 def test_day_change_clears_the_pending_reward_and_the_lean():
     import datetime
-    from tests.test_controller import full_pool, ARMS as ARM_LETTERS, crowd as crowd_msg
+    from tests.helpers import full_pool, ARMS as ARM_LETTERS, crowd as crowd_msg
     from cockaigne_controller.clipmap import ClipMap
     from cockaigne_controller.config import load
     from cockaigne_controller.loop import Controller
@@ -153,7 +153,7 @@ def test_personality_follows_the_date_and_sets_the_priors():
 def test_day_start_resets_beliefs_and_notes_the_ledger(tmp_path):
     import json
     from cockaigne_sensing.bus import Ledger
-    from tests.test_controller import full_pool, ARMS as ARM_LETTERS
+    from tests.helpers import full_pool, ARMS as ARM_LETTERS
     from cockaigne_controller.clipmap import ClipMap
     from cockaigne_controller.config import load
     from cockaigne_controller.loop import Controller
@@ -184,7 +184,7 @@ def test_day_start_resets_beliefs_and_notes_the_ledger(tmp_path):
 
 def test_reward_flows_from_cohesion_into_the_belief():
     import random as _r
-    from tests.test_controller import full_pool, ARMS as ARM_LETTERS, crowd as crowd_msg
+    from tests.helpers import full_pool, ARMS as ARM_LETTERS, crowd as crowd_msg
     from cockaigne_controller.clipmap import ClipMap
     from cockaigne_controller.config import load
     from cockaigne_controller.loop import Controller

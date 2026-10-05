@@ -10,6 +10,7 @@ For a live camera, t is time.monotonic() at the moment the frame arrived.
 from __future__ import annotations
 
 import os
+import re
 import time
 from typing import Iterator
 
@@ -31,10 +32,16 @@ def reolink_url(ip: str, user: str, password: str, stream: str = "sub") -> str:
     return f"rtsp://{user}:{password}@{ip}:554/{path}"
 
 
+def public_uri(uri: str) -> str:
+    """The address with any password hidden, safe for error messages and logs."""
+    return re.sub(r"//([^:/@]+):[^@]+@", r"//\1:***@", uri)
+
+
 class FrameSource:
     """Yields frames from a camera or a file at a chosen rate."""
 
-    def __init__(self, uri: str, name: str = "cam", every_nth: int = 1):
+    def __init__(self, uri: str, name: str = "cam", every_nth: int = 1,
+                 retry_s: float = 0.5):
         """uri is an RTSP address or a file path.
 
         every_nth keeps one frame in every n. Detection does not need every
@@ -43,10 +50,11 @@ class FrameSource:
         self.uri = uri
         self.name = name
         self.every_nth = max(1, int(every_nth))
+        self.retry_s = retry_s
         self.live = uri.lower().startswith("rtsp://")
         self.cap = cv2.VideoCapture(uri, cv2.CAP_FFMPEG)
         if not self.cap.isOpened():
-            raise RuntimeError(f"could not open {name}: {uri}")
+            raise RuntimeError(f"could not open {name}: {public_uri(uri)}")
         if self.live:
             # Keep the smallest buffer so a slow consumer sees fresh frames,
             # not a growing backlog.
@@ -63,7 +71,7 @@ class FrameSource:
             if not ok:
                 if self.live:
                     # A live stream that drops is reopened rather than ended.
-                    time.sleep(0.5)
+                    time.sleep(self.retry_s)
                     self.cap.release()
                     self.cap = cv2.VideoCapture(self.uri, cv2.CAP_FFMPEG)
                     continue

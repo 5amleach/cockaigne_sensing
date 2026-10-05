@@ -56,6 +56,17 @@ def test_sitting_scenario_is_read_as_sitting():
     assert crowds[-1]["actions"]["sitting"] == 1
 
 
+def test_day_keeps_one_id_one_person_and_ends_empty():
+    duration, actors = SCENARIOS["day"]()
+    assert duration == 490.0
+    last = None
+    for msg in messages(duration, actors, W, L):
+        ids = [p["id"] for p in msg["people"]]
+        assert len(ids) == len(set(ids))   # one id is always one person
+        last = msg
+    assert last["people"] == []            # everyone has gone home
+
+
 def test_leaving_scenario_drains():
     crowds, _ = run_scenario("leaving")
     assert crowds[-1]["n"] == 0

@@ -173,7 +173,8 @@ async def read_layout_until_ready(resolume: Resolume, log: logging.Logger,
 async def run(cfg: dict, layout_path: str | None = None, record: str | None = None) -> None:
     log = make_logger(cfg["controller"]["log_path"])
     res_cfg = cfg["resolume"]
-    resolume = Resolume(res_cfg["host"], res_cfg["osc_port"], res_cfg["rest_port"])
+    resolume = Resolume(res_cfg["host"], res_cfg["osc_port"], res_cfg["rest_port"],
+                        res_cfg["rest_timeout_s"], res_cfg["confirm_timeout_s"])
     if layout_path:
         layout = load_layout(layout_path)
         confirm_s = 0.0

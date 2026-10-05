@@ -46,21 +46,24 @@ def connected_from_layer(data: dict) -> int | None:
 class Resolume:
     """One OSC client and one REST endpoint, both local."""
 
-    def __init__(self, host: str, osc_port: int, rest_port: int):
+    def __init__(self, host: str, osc_port: int, rest_port: int,
+                 rest_timeout_s: float = 5.0, confirm_timeout_s: float = 1.0):
         self.host = host
         self.rest_port = rest_port
+        self.rest_timeout_s = rest_timeout_s
+        self.confirm_timeout_s = confirm_timeout_s
         self._osc = SimpleUDPClient(host, osc_port)
 
     def read_layout(self) -> dict[str, tuple[int, int]]:
         r = requests.get(f"http://{self.host}:{self.rest_port}/api/v1/composition",
-                         timeout=5)
+                         timeout=self.rest_timeout_s)
         r.raise_for_status()
         return layout_from_composition(r.json())
 
     def connected_clip(self, layer: int) -> int | None:
         """Which clip the layer reports as connected, 1-based, over REST."""
         r = requests.get(f"http://{self.host}:{self.rest_port}/api/v1/composition"
-                         f"/layers/{layer}", timeout=1)
+                         f"/layers/{layer}", timeout=self.confirm_timeout_s)
         r.raise_for_status()
         return connected_from_layer(r.json())
 

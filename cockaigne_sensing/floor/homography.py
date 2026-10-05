@@ -12,9 +12,13 @@ from pathlib import Path
 import numpy as np
 
 
-def load_homography(path: str | Path) -> np.ndarray:
+def load_homography(path: str | Path) -> tuple[np.ndarray, tuple[int, int] | None]:
+    """The matrix and the image size it was calibrated at (None if unsaved).
+    The floor stage scales pixel coordinates when a message's frame size
+    differs from the calibration's, so a sub-stream can use a 4K calibration."""
     data = json.loads(Path(path).read_text())
-    return np.array(data["H"], dtype=float)
+    size = data.get("image_size")
+    return np.array(data["H"], dtype=float), (int(size[0]), int(size[1])) if size else None
 
 
 def feet_point(box) -> tuple[float, float]:

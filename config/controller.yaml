@@ -13,6 +13,8 @@ resolume:
   audio_bank_b: [6, 7, 8, 9]   # four stem layers, bank B; two banks so an arm change can crossfade
   confirm_s: 2.0      # after a fire, confirm over REST within this long that the right clip connected
   confirm_poll_s: 0.5 # how often to look while confirming
+  rest_timeout_s: 5.0 # how long one REST request may take at start-up
+  confirm_timeout_s: 1.0  # how long one REST request may take while confirming
 
 clock:
   clip_s: 60.0        # every clip is this long; the controller fires the next on its own clock

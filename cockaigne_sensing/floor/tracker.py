@@ -1,7 +1,8 @@
 """Follows people on the floor plan and gives each one a room-wide id.
 
-Input, each step: a list of floor sightings for one instant, already merged
-across cameras. Output: the people list for Contract 1.
+Input, each step: a list of floor sightings for one instant, carrying which
+camera saw each and its pixel rectangle, so merging can tell two views of
+one person from two people standing close. Output: the people list for Contract 1.
 
 The method is the plain one. Each known person is predicted forward along
 their velocity. Sightings are matched to predictions nearest first, within a
@@ -23,6 +24,20 @@ class Sighting:
     box_ratio: float   # width / height of the rectangle in the best camera view
     box_h: float       # that rectangle's height in pixels
     conf: float
+    camera: str = "cam"          # which camera saw it
+    det_id: int = 0              # the detector's own track id on that camera
+    box: tuple | None = None     # the pixel rectangle, for duplicate detection
+
+
+def _iou(a: tuple | None, b: tuple | None) -> float:
+    """Overlap of two pixel rectangles as a fraction of their union."""
+    if not a or not b:
+        return 0.0
+    ix = max(0.0, min(a[2], b[2]) - max(a[0], b[0]))
+    iy = max(0.0, min(a[3], b[3]) - max(a[1], b[1]))
+    inter = ix * iy
+    union = ((a[2] - a[0]) * (a[3] - a[1]) + (b[2] - b[0]) * (b[3] - b[1]) - inter)
+    return inter / union if union > 0 else 0.0
 
 
 @dataclass
@@ -41,21 +56,25 @@ class Person:
 
 class FloorTracker:
     def __init__(self, merge_distance_m=0.5, drop_after_s=3.0, velocity_window_s=1.0,
-                 gate_m=1.2, coast_s=1.0, bounds=None):
+                 gate_m=1.2, coast_s=1.0, bounds=None, same_camera_iou=0.5):
         self.merge_distance_m = merge_distance_m
         self.drop_after_s = drop_after_s
         self.velocity_window_s = velocity_window_s
         self.gate_m = gate_m
         self.coast_s = coast_s
         self.bounds = bounds  # (floor width, floor length); coasted positions stay inside it
+        self.same_camera_iou = same_camera_iou
         self.people: dict[int, Person] = {}
         self._next_id = 1
 
     def merge(self, sightings: list[Sighting]) -> list[Sighting]:
-        """Collapse sightings of the same person seen by more than one camera.
+        """Collapse sightings of the same person, without eating their neighbour.
 
-        Closest-to-camera first (tallest rectangle), absorbing anything within
-        merge_distance_m. The absorbed sightings' positions are averaged.
+        Two cameras' views of one person merge by floor distance. Within one
+        camera, two rectangles merge only when they overlap heavily in pixels
+        (a duplicate detection); two people standing side by side in one
+        camera stay two people. Closest-to-camera first (tallest rectangle);
+        the absorbed sightings' positions are averaged.
         """
         pending = sorted(sightings, key=lambda s: -s.box_h)
         merged: list[Sighting] = []
@@ -64,7 +83,10 @@ class FloorTracker:
             group = [lead]
             rest = []
             for s in pending:
-                if (s.x - lead.x) ** 2 + (s.y - lead.y) ** 2 <= self.merge_distance_m ** 2:
+                close = (s.x - lead.x) ** 2 + (s.y - lead.y) ** 2 <= self.merge_distance_m ** 2
+                if s.camera != lead.camera and close:
+                    group.append(s)
+                elif s.camera == lead.camera and _iou(s.box, lead.box) > self.same_camera_iou:
                     group.append(s)
                 else:
                     rest.append(s)
@@ -75,6 +97,10 @@ class FloorTracker:
         return merged
 
     def update(self, t: float, sightings: list[Sighting]) -> list[Person]:
+        # Expire the stale first, so a long-absent id cannot be revived with
+        # its old age by a new arrival standing in the same place.
+        for pid in [pid for pid, p in self.people.items() if t - p.last_seen > self.drop_after_s]:
+            del self.people[pid]
         sightings = self.merge(sightings)
         # Predict where each known person should be now.
         predicted = {}
@@ -103,9 +129,6 @@ class FloorTracker:
                            box_ratio=s.box_ratio, box_h=s.box_h, history=[(t, s.x, s.y)])
                 self._next_id += 1
                 self.people[p.id] = p
-        # Drop anyone unseen too long.
-        for pid in [pid for pid, p in self.people.items() if t - p.last_seen > self.drop_after_s]:
-            del self.people[pid]
         # A person missed this step is still reported at their predicted
         # position for up to coast_s, so a moment of occlusion does not make
         # them vanish from the people list. Their age keeps counting.

@@ -25,6 +25,7 @@ class Recorder:
 
     def write(self, message: dict) -> None:
         self._f.write(json.dumps(message, separators=(",", ":")) + "\n")
+        self._f.flush()  # a crash loses nothing already written
 
     def close(self) -> None:
         self._f.close()

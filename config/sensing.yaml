@@ -23,6 +23,9 @@ cameras:
   #   ip: 192.168.1.102
   #   ...
 
+capture:
+  retry_s: 0.5    # how long to wait before reopening a dropped camera stream
+
 detector:
   model: yolo11s.pt    # pretrained Ultralytics weights, person class only
   imgsz: 1280          # input size the detector sees; 1280 found the far seated person, 640 may not
@@ -30,12 +33,18 @@ detector:
   tracker: bytetrack.yaml
   device: auto         # auto picks the GPU when present, otherwise CPU
   min_track_age_s: 1.0 # a track younger than this is not reported; removes one-frame flickers
+  forget_after_s: 5.0  # a camera track id unseen this long is forgotten
 
 floor_tracker:
-  merge_distance_m: 0.5   # two floor positions closer than this are the same person
+  merge_distance_m: 0.5   # two cameras' floor positions closer than this are the same person
+  same_camera_iou: 0.5    # within one camera, boxes overlapping more than this are one person
   drop_after_s: 3.0       # a person unseen for this long is removed
   velocity_window_s: 1.0  # velocity is averaged over this window
   coast_s: 1.0            # a person missed this long is still reported at their predicted position
+  gate_m: 1.2             # a sighting further than this from a prediction is not that person
+  bucket_s: 0.1           # camera messages within this window count as one instant
+  margin_m: 0.3           # observed feet may fall this far outside the floor and still count
+  warn_every_s: 30        # a camera problem is said at most this often
 
 cohesion:
   smooth_window_s: 10.0   # weighted average window for the raw score

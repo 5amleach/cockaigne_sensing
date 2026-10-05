@@ -12,7 +12,7 @@ Scenarios:
   sitting  one person walks in, stops, and sits down (60 s)
   leaving  three people stand near the spot, then leave one by one and the
            room stays empty (90 s)
-  day      all four, one after another (450 s)
+  day      all four, one after another (490 s)
 
 People walk along straight lines between waypoints, so the emitted velocity
 is exactly the slope of the path, as a downstream consumer expects. A little
@@ -111,11 +111,19 @@ def leaving() -> tuple[float, list[Actor]]:
 
 
 def day() -> tuple[float, list[Actor]]:
-    """The four scenarios one after another, with gaps."""
+    """The four scenarios one after another with gaps, 490 seconds in all.
+
+    Each scenario's actors leave when their scenario ends and carry ids from
+    their own block of one hundred, so the combined day keeps the people
+    contract: one id is always one person, and nobody lingers forever."""
     actors, at = [], 0.0
-    for build in (lone, group, sitting, leaving):
+    for block, build in enumerate((lone, group, sitting, leaving)):
         duration, scene = build()
-        actors.extend(shifted(a, at) for a in scene)
+        for a in scene:
+            moved = shifted(a, at)
+            moved.pid = a.pid + 100 * block
+            moved.leaves = min(moved.leaves, at + duration)
+            actors.append(moved)
         at += duration + 10.0
     return at, actors
 
