@@ -60,9 +60,13 @@ Publishes the people list and the crowd state over a WebSocket on the local mach
 
 Command-line helpers. `bench_detect` runs detection over a video file and reports. `calibrate` helps produce a camera's homography from four clicked points. `fake_room` generates a made-up people list with scripted behaviour, so features, the controller and the data wall can be built before any camera exists. `replay` plays a recorded file into the bus.
 
+## The controller
+
+The controller is the second package in this repo, `cockaigne_controller`, decided 5 October 2026 so one session can test the whole chain. It reads the crowd state (Contract 2) from the bus, decides the next clip with a bandit over the eight arms, fires it in Resolume over OSC, and publishes its decision (Contract 3) back through the bus for the data wall. Its full brief, including the clip naming rule, the clock, the daily personalities and the build order, is `cockaigne_controller/BRIEF.md`. Everything adjustable lives in `config/controller.yaml`.
+
 ## What is not in this repo
 
-The controller (bandit, ring logic, Resolume OSC) and the data wall (HTML page) are separate projects. They consume Contracts 1 and 2 and produce nothing this repo needs. Keeping them apart means either can be rebuilt without touching sensing.
+The data wall (HTML page) is a separate project. It consumes Contracts 1, 2 and 3 over one WebSocket and produces nothing this repo needs. Keeping it apart means it can be rebuilt without touching sensing or the controller.
 
 ## Privacy rules built into the code
 

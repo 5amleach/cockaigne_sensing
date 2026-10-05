@@ -71,3 +71,7 @@ Format: date, who decided, the decision, the reason in one or two sentences.
 **2026-10-05 — Sam, with Claude.** The controller lives in this repo as a second package, `cockaigne_controller`, rather than in a separate repo. Reason: one session can then build and test the whole chain, sensing through to clip decision, against the same fixtures and fake room.
 
 **2026-10-05 — Sam, with Claude.** The bus rebroadcasts any message a client sends it to every other client. Reason: the controller publishes its clip decisions (Contract 3) back through the bus, so the data wall needs one socket for the whole installation.
+
+**2026-10-05 — Sam, via the controller brief.** Arm letters: a Architecture, u Furniture, s Storm, r Rivers, f Feast, h Herd, m Machinery, c Cargo. The letter c is to be confirmed against the clip files. The full controller brief is saved as `cockaigne_controller/BRIEF.md`; ARCHITECTURE.md points to it.
+
+**2026-10-05 — Claude Code.** Two dependencies added for the controller: python-osc (firing clips in Resolume over OSC) and requests (reading the composition over Resolume's REST API at start-up). Both touch only the local machine.
