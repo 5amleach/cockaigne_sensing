@@ -23,7 +23,8 @@ map:
   rings: 4
 
 controller:
-  default_arm: machinery   # the fixed arm for the ring-only loop (build step 3); the bandit replaces it
+  arm_chooser: bandit      # "bandit" live; "fixed" pins default_arm, for tests and soaking one arm on site
+  default_arm: machinery   # the arm used when arm_chooser is fixed
   tick_s: 0.1              # how often the loop checks its clock
 
 occupancy:

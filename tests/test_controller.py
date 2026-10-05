@@ -25,7 +25,7 @@ def full_pool():
 
 def make_controller(pool=None, **cfg_over):
     cfg = load()
-    cfg["controller"] = dict(cfg["controller"], **cfg_over)
+    cfg["controller"] = dict(cfg["controller"], arm_chooser="fixed", **cfg_over)
     names = pool if pool is not None else full_pool()
     layout = {n: (1, i) for i, n in enumerate(names, start=1)}
     cmap = ClipMap(names, ARMS)

@@ -7,8 +7,12 @@ and nothing else, and the arm comes from the arm chooser. At the audio lead
 at the boundary the clip is fired, the decision is published back through
 the bus for the data wall, and a ledger entry is appended.
 
-Build step 3: the arm is fixed from config (controller.default_arm). The
-bandit replaces `choose_arm` in build step 4.
+The arm comes from the bandit (build step 4): a Thompson draw per arm in
+the current occupancy context, plus the action lean. Setting
+controller.arm_chooser to "fixed" pins the arm from config instead, which
+is how the ring mechanics are tested and how a single arm can be soaked on
+site. Each day starts with a personality (build step 5): the beliefs reset
+to the day's priors and the ledger notes who woke up.
 
 Run it against the fake room and the fake Resolume:
     python -m cockaigne_sensing.bus.run fake_people_and_crowd.jsonl   (terminal 1)
@@ -19,17 +23,22 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import datetime
 import json
 import math
+import random
 import time
 
 # Recorder and Ledger are the bus module's public face; the controller
 # shares its ledger file by design (BRIEF.md, "The ledger").
 from cockaigne_sensing.bus import Ledger, Recorder
 
+from . import audio
+from .bandit import ActionBias, Bandit, reward_from_delta
 from .clipmap import BARREN, ClipMap, node_name
 from .clock import ClipClock
 from .config import load
+from .personality import personality_for, priors
 from .resolume import Resolume, layout_from_composition
 
 
@@ -40,7 +49,8 @@ class Controller:
     so the tests drive it directly.
     """
 
-    def __init__(self, cfg: dict, clipmap: ClipMap, layout: dict):
+    def __init__(self, cfg: dict, clipmap: ClipMap, layout: dict,
+                 rng: random.Random | None = None):
         self.cfg = cfg
         self.map = clipmap
         self.layout = layout
@@ -51,10 +61,24 @@ class Controller:
         self.n_smooth = 0.0
         self.cohesion = 0.0
         self._t_prev: float | None = None
+        self.rng = rng or random.Random()
+        contexts = [name for _, name in cfg["occupancy"]["bands"]]
+        self.bandit = Bandit(list(self.arms.values()), contexts, self.rng)
+        self.action_bias = ActionBias(cfg["action_bias"], cfg["occupancy"]["band_size"])
+        self.personality: str | None = None
+        self.reward_scale = cfg["bandit"]["reward_scale"]
+        self.patience = cfg["bandit"]["reward_delay_s"]
+        self._day: datetime.date | None = None
+        self._pending_reward: dict | None = None
+        self.last_outcome: dict | None = None
 
     # --- crowd state ---
 
-    def observe(self, crowd: dict) -> None:
+    def observe(self, crowd: dict, now: float | None = None) -> None:
+        """A crowd message arrived. `now` is the controller's own clock at
+        receipt; it defaults to the message's t, which is the same clock when
+        sensing runs live on this machine, but differs under replay, where
+        the recording's time starts at zero."""
         self.ring = crowd["ring_target"]
         self.n = crowd["n"]
         self.cohesion = crowd["cohesion_smooth"]
@@ -64,6 +88,14 @@ class Controller:
         tau = self.cfg["occupancy"]["smooth_window_s"]
         alpha = 1.0 - math.exp(-dt / tau) if dt > 0 else 0.0
         self.n_smooth += alpha * (self.n - self.n_smooth)
+        self.action_bias.observe(crowd)
+        # The reward window opens patience seconds into the clip: remember
+        # the cohesion there, so the clip is judged on what followed it.
+        p = self._pending_reward
+        now = t if now is None else now
+        if p and p.get("t_fired") is not None and p["c_start"] is None \
+                and now >= p["t_fired"] + self.patience:
+            p["c_start"] = self.cohesion
 
     def context(self) -> str:
         """The occupancy band, from the smoothed headcount."""
@@ -75,12 +107,51 @@ class Controller:
 
     # --- choosing ---
 
+    # --- the day ---
+
+    def ensure_day(self, date: datetime.date, ledger=None) -> None:
+        """At day start: pick the personality, reset the beliefs to its
+        priors, note it in the ledger. The ledger itself is never reset."""
+        if date == self._day:
+            return
+        self._day = date
+        name, params = personality_for(date, self.cfg)
+        self.personality = name
+        self.reward_scale = params["reward_scale"]
+        self.patience = params["patience_s"]
+        self.bandit.reset(priors(params, list(self.arms.values())))
+        if ledger:
+            ledger.append("day_start", personality=name)
+
+    # --- the reward for the clip just played ---
+
+    def fired(self, t: float) -> None:
+        """The loop calls this at the moment the clip actually starts."""
+        if self._pending_reward:
+            self._pending_reward["t_fired"] = t
+
+    def _settle_reward(self) -> None:
+        """The clip is over: judge it by how cohesion moved and update the
+        belief it was drawn from. Barren is nobody's arm and gets none."""
+        p, self._pending_reward = self._pending_reward, None
+        if not p or p["arm"] == "barren" or p.get("c_start") is None:
+            return
+        delta = self.cohesion - p["c_start"]
+        reward = reward_from_delta(delta, self.reward_scale)
+        self.bandit.update(p["context"], p["arm"], reward)
+        self.last_outcome = {"arm": p["arm"], "delta_cohesion": round(delta, 3),
+                             "reward": round(reward, 2), "context": p["context"]}
+
     def choose_arm(self) -> tuple[str, str]:
-        """The arm letter and the reason. Fixed from config until the bandit
-        (build step 4) takes over."""
-        wanted = self.cfg["controller"]["default_arm"]
+        """The arm letter and the reason it was chosen."""
+        if self.cfg["controller"]["arm_chooser"] == "fixed":
+            wanted = self.cfg["controller"]["default_arm"]
+            reason = "ring"
+        else:
+            context = self.context()
+            wanted, reason = self.bandit.choose(context, self.action_bias.bias(context))
         letter = next(l for l, name in self.arms.items() if name == wanted)
-        return letter, "ring"
+        return letter, reason
 
     def _probe_from(self, frm: str, arm_letter: str) -> str:
         """Where to go when staying put and the node has no loop clip.
@@ -105,7 +176,12 @@ class Controller:
 
     def decide(self, t: float) -> tuple[dict, tuple[int, int]]:
         """One decision: the Contract 3 message and the (layer, index) to fire."""
+        self._settle_reward()
         arm_letter, base_reason = self.choose_arm()
+        # Staying in the current arm while the ring moves is a ring story,
+        # whatever the chooser said; the chooser's reason belongs to arm changes.
+        if self.node != BARREN and self.node[0] == arm_letter:
+            base_reason = "ring"
         target = BARREN if self.ring == 0 else node_name(arm_letter, self.ring)
         frm = self.node
         if target == frm:
@@ -126,7 +202,10 @@ class Controller:
             "from": frm, "to": to, "clip": clip, "resolume_index": index,
             "arm": arm_name, "reason": reason,
             "context": self.context(), "ring_target": self.ring,
+            "personality": self.personality,
         }
+        self._pending_reward = {"arm": arm_name, "context": decision["context"],
+                                "t_fired": None, "c_start": None}
         return decision, (layer, index)
 
 
@@ -170,7 +249,7 @@ async def run(cfg: dict, layout_path: str | None = None, record: str | None = No
             async for raw in ws:
                 msg = json.loads(raw)
                 if msg.get("stream") == "crowd":
-                    controller.observe(msg)
+                    controller.observe(msg, time.monotonic())
 
         from websockets.exceptions import ConnectionClosed
 
@@ -178,6 +257,7 @@ async def run(cfg: dict, layout_path: str | None = None, record: str | None = No
         try:
             while True:
                 now = time.monotonic()
+                controller.ensure_day(datetime.date.today(), ledger)
                 if clock.started is None or clock.clip_due(now):
                     if pending is None:  # the very first clip has no audio lead
                         pending = controller.decide(now)
@@ -189,6 +269,10 @@ async def run(cfg: dict, layout_path: str | None = None, record: str | None = No
                     except ConnectionClosed:
                         print("bus went away; stopping")
                         return
+                    controller.fired(now)
+                    if controller.last_outcome:
+                        ledger.append("outcome", **controller.last_outcome)
+                        controller.last_outcome = None
                     ledger.append("decision", arm=decision["arm"],
                                   ring=decision["ring_target"], n=controller.n,
                                   clip=decision["clip"], reason=decision["reason"])
@@ -200,7 +284,7 @@ async def run(cfg: dict, layout_path: str | None = None, record: str | None = No
                           f"({decision['reason']}, {decision['context']})")
                 elif clock.audio_due(now):
                     pending = controller.decide(now)
-                    # Audio stems for the incoming arm start here (build step 6).
+                    audio.set_stems(resolume, cfg, pending[0]["ring_target"])
                     clock.mark_audio()
                 await asyncio.sleep(cfg["controller"]["tick_s"])
         finally:

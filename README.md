@@ -44,4 +44,4 @@ That prints how many people were found each second, saves a few annotated frames
 
 ## Status
 
-5 Oct 2026. Capture, detect, floor, features, the fake room and the bus (publisher, ledger, recorder, replayer) exist; the chain runs end to end on venue footage and on scripted rooms (see `bench/`). Actions is described but not yet written, as it needs the render PC's GPU.
+5 Oct 2026. Capture, detect, floor, features, the fake room and the bus exist; the chain runs end to end on venue footage and on scripted rooms (see `bench/`). The controller (`cockaigne_controller`) exists through build step 5 — clip map, clock, bandit, action lean, daily personality, ledger — with audio stems stubbed, and has run against the fake day, the bus and the fake Resolume. Actions is described but not yet written, as it needs the render PC's GPU.
