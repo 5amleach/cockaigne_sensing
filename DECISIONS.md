@@ -59,3 +59,5 @@ Format: date, who decided, the decision, the reason in one or two sentences.
 **2026-10-05 — Sam.** The data wall lists the four moods with a symbol and a count under each. The per-person tally stays.
 
 **2026-10-05 — Sam.** The Festival has confirmed it has no objection to the sensing and the mood display, so no disclosure change is needed from their side.
+
+**2026-10-05 — Claude Code.** The fake room exists (`tools.fake_room`) with four scripted scenarios: lone viewer settling on the spot, a group of six gathering and scattering, one person sitting down, everyone leaving. The door is assumed to be in the corner at the closed end of the U until the real floor plan says otherwise. The controller and the data wall can be built against these recordings before any camera is mounted.
