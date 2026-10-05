@@ -39,6 +39,9 @@ floor_tracker:
 cohesion:
   smooth_window_s: 10.0   # weighted average window for the raw score
   still_speed_mps: 0.15   # slower than this counts as standing still
+  signals: [clustering, synchrony, stillness]  # relational signals in use; spare1 and spare2 exist in code for more
+  clustering_zero_at_ratio: 2.0  # spacing at this multiple of random placement scores 0; random spacing scores 0.5
+  crowd_interval_s: 1.0   # how often the crowd state message is emitted
   occupancy_window_s: 10.0   # headcount is smoothed over this before it is used for blending
   blend_weight_by_n: [[1, 0.0], [2, 0.5], [3, 0.9], [4, 1.0]]  # weight on relational cohesion vs proxy, by smoothed headcount
   proxy_ceiling: 0.75     # the proxy score can never exceed this; ring_up[3] is above it on purpose
@@ -53,8 +56,24 @@ cohesion:
   ring_down: [0.1, 0.3, 0.5, 0.7]   # level below which the ring drops to 0, 1, 2, 3
 
 mood:
+  # Everything in this section is a starting guess, to be tuned on site against
+  # footage from the final camera height. Treat the labels as provisional until then.
   label_dwell_s: 8.0      # a person's mood label holds at least this long before it can change
   sitting_ratio: 0.75     # box width / height above this, while stopped, reads as sitting
+  sitting_still_s: 2.0    # how long a person must have been stopped before sitting is read
+  arousal_speed_full_mps: 1.2  # walking at this speed scores arousal 1.0; arousal is from speed alone for now
+  accel_window_s: 2.0     # movement roughness is averaged over this window
+  valence_ref_s: 20.0     # the standing-height reference decays over about this long
+  valence_slump_neutral: 0.15  # slump below this fraction of standing height reads neutral
+  valence_slump_scale: 0.3     # slump this far beyond neutral costs one whole unit of valence
+  valence_jerk_scale: 3.0      # movement roughness (metres per second squared) that costs one unit of valence
+  straightness_window_s: 30.0  # path straightness is judged over this window
+  straightness_min_path_m: 1.0 # with less walking than this, straightness is not judged at all
+  bored_straightness: 0.4 # wandering below this straightness, while calm, reads as bored
+  bored_arousal_max: 0.4  # ...and only while arousal is below this
+  happy_valence: 0.1      # valence above this reads happy
+  sad_valence: -0.1       # valence below this reads sad, or annoyed when arousal is high
+  annoyed_arousal: 0.6    # negative valence with arousal at or above this reads annoyed
 
 actions:
   model: qwen2.5vl:3b     # Ollama model tag; alternatives gemma3:4b, moondream
@@ -62,6 +81,9 @@ actions:
   agree_readings: 2       # readings in a row that must agree before an action is reported
   baseline_window_s: 600  # window for each action's running baseline rate
   enabled: [phone, drink, eat]   # Sam confirmed 19 Sept 2026 that eat and drink are in scope
+  count_min: 0.5          # an action score at or above this counts the person as doing it
+  rate_window_s: 60       # the "current rate" in action_rates is averaged over this window
+  baseline_floor: 0.02    # the baseline rate is never below this, so a first action in a quiet room reads as a spike, not infinity
 
 bus:
   host: 127.0.0.1

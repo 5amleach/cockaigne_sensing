@@ -44,4 +44,4 @@ That prints how many people were found each second, saves a few annotated frames
 
 ## Status
 
-5 Oct 2026. Capture, detect and floor exist and run end to end on the venue footage (see `bench/`). Features and the fake room are being built. Actions and the bus publisher are described but not yet written.
+5 Oct 2026. Capture, detect, floor and features exist and run end to end on the venue footage (see `bench/`). The fake room, actions and the bus publisher are described but not yet written.
