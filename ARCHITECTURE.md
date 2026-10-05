@@ -38,17 +38,17 @@ Output is the **people list** (Contract 1): one entry per person with position, 
 
 Pure arithmetic on the people list. No models.
 
-Crowd: clustering (mean nearest-neighbour distance compared with what random placement would give for the same headcount and floor), synchrony (how aligned everyone's movement vectors are), stillness (fraction standing still at once). These combine by geometric mean, so a low score on any one pulls the whole down. The combined score is smoothed over ten seconds, then feeds a reservoir that fills while the score is high and drains slowly when it is low. The reservoir level picks the ring. Going up needs a higher level than coming down, so the wall does not flicker at a boundary.
+Crowd: clustering (mean nearest-neighbour distance compared with what random placement would give for the same headcount and floor), synchrony (how aligned everyone's movement vectors are), stillness (fraction standing still at once). Stillness and synchrony fold into one signal, coordination, and relational cohesion is the geometric mean of clustering and coordination, so a low score on either pulls the whole down. A proxy score (time in the room, stillness, distance from the viewing spot) stands in when the room is nearly empty; the two blend by the smoothed headcount, under a headcount-following ceiling that keeps the top ring collective. The blended score is smoothed over ten seconds, then feeds a reservoir that fills while the score is high and drains slowly when it is low. The reservoir level picks the ring. Going up needs a higher level than coming down, so the wall does not flicker at a boundary.
 
-Per person: posture (sitting, standing, walking) from the rectangle's width-to-height ratio and whether the person has stopped. Arousal from speed, acceleration and vertical bounce. Valence from slump relative to the person's own standing height and from smoothness of movement. Path straightness (straight-line distance divided by distance walked) for boredom. These four numbers map to Happy, Sad, Bored, Annoyed with a dwell timer so labels do not flicker.
+Per person: posture (sitting, standing, walking) from the rectangle's width-to-height ratio and whether the person has stopped. Arousal from speed alone for now; acceleration and vertical bounce join once there is footage from the final camera height to tune against. Valence from slump relative to the person's own standing height and from smoothness of movement. Path straightness (straight-line distance divided by distance walked) for boredom. These four numbers map to Happy, Sad, Bored, Annoyed with a dwell timer so labels do not flicker.
 
 Output is the **crowd state** (Contract 2).
 
-Every threshold lives in `config/sensing.yaml`. Expect to change them on site for a week.
+Every threshold meant to be tuned on site lives in `config/sensing.yaml`. Expect to change them on site for a week.
 
 ### actions
 
-Every few seconds, for each tracked person, cuts the person's rectangle out of the main-stream frame and asks a local vision-language model one multiple-choice question: phone, drinking, eating, or none of these. Requires two agreeing answers in a row before reporting an action. Runs through Ollama on the GPU. Results are merged into the people list as per-person action scores.
+Not yet built; what follows is the design. Every few seconds, for each tracked person, cuts the person's rectangle out of the main-stream frame and asks a local vision-language model one multiple-choice question: phone, drinking, eating, or none of these. Requires two agreeing answers in a row before reporting an action. Runs through Ollama on the GPU. Results are merged into the people list as per-person action scores.
 
 There is no cheap shortcut for phones. A lit screen was expected to show as a bright rectangle in infrared, but on venue footage the screen faces the holder and the brightest things in the crop are hands and forearms. The model answers for all three actions.
 
@@ -71,5 +71,5 @@ The data wall (HTML page) is a separate project. It consumes Contracts 1, 2 and 
 ## Privacy rules built into the code
 
 - Recording is off unless `--record` is passed explicitly. The gallery configuration never passes it.
-- No module below `capture` receives a frame except `actions`, which receives only a cropped rectangle and discards it after the model answers.
+- Frames flow from `capture` into `detect`, which needs whole pictures to find people. Nothing past `detect` receives a frame except `actions`, which will receive only a cropped rectangle and discard it after the model answers. The bench tool saves annotated snapshots for development on a desk; it never runs in the gallery.
 - Nothing leaves the machine. The bus binds to localhost.

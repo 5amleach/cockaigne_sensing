@@ -2,7 +2,7 @@
 
 The JSON messages that pass between modules. These are fixed. Any change is agreed first and logged in `DECISIONS.md`, and every module that reads or writes the message is updated in the same commit.
 
-All times are seconds as a float. Live, `t` is `time.monotonic()` on the sensing machine. From a file, `t` is the frame's time within the file. All positions are in metres on a floor plan. The origin is the corner where the data wall meets the left arm of the U. `x` runs along the data wall. `y` is 0 at the data wall and increases toward the closed end of the U. Confidences run 0 to 1.
+All times are seconds as a float. Live, `t` is `time.monotonic()` on the sensing machine. From a file, `t` is the frame's time within the file; under replay the controller still runs on its own clock, so a mixed recording does not share one timeline. A decision's `t` is when it was planned, at the audio lead, about five seconds before it fires. All positions are in metres on a floor plan. The origin is the corner where the data wall meets the left arm of the U. `x` runs along the data wall. `y` is 0 at the data wall and increases toward the closed end of the U. Confidences run 0 to 1.
 
 ## Contract 0 — camera tracks
 
@@ -33,7 +33,7 @@ All times are seconds as a float. Live, `t` is `time.monotonic()` on the sensing
  ]}
 ```
 
-- `id` is stable across the whole room and all cameras.
+- `id` is stable across the whole room and all cameras, as best a plain tracker can: a crossing, a long occlusion or a calibration error can retire or swap an id.
 - `x`, `y` in metres; `vx`, `vy` in metres per second, smoothed.
 - `age` is seconds since this person was first seen.
 - `box_ratio` is the rectangle's width divided by its height in the best camera view. `box_h` is that rectangle's height in pixels, used to judge slump against the person's own standing height.
@@ -64,12 +64,14 @@ Controller → bus → data wall. Owned by the controller package (`cockaigne_co
 ```json
 {"stream": "decision", "t": 12.4, "from": "b", "to": "m1", "clip": "b_m1",
  "resolume_index": 47, "arm": "machinery", "reason": "action_bias",
- "context": "small", "personality": "Operator", "ring_target": 1}
+ "context": "small", "personality": "Operator", "ring_target": 1,
+ "confirmed": true}
 ```
 
 - `from` and `to` are nodes: `b` (Barren) or an arm letter plus a ring number.
 - `context` is the occupancy band: `solo`, `small`, `medium` or `large`.
 - `reason` is one of `ring`, `bandit`, `action_bias`, `path` (an intermediate step), `loop`, `probe`, `lateral` (holding a ring by moving sideways to another arm).
+- `confirmed` says whether Resolume confirmed the clip connected; when false, the wall's position was held and the move is retried next cycle.
 
 ## Ledger entries
 
@@ -85,7 +87,7 @@ Controller → bus → data wall. Owned by the controller package (`cockaigne_co
 
 ## Recording format
 
-Every message above, one per line, in a `.jsonl` file, with an extra top-level field `"stream"` naming the contract: `"tracks"`, `"people"`, `"crowd"`, `"decision"`. The replayer reads the file and re-emits each line when its `t` comes due.
+Every message above, one per line, in a `.jsonl` file, with an extra top-level field `"stream"` naming the contract: `"tracks"`, `"people"`, `"crowd"`, `"decision"`. The replayer reads the file and re-emits each line when its `t` comes due. The bus's `--record` captures the stream it is replaying; messages clients send back (decisions) are rebroadcast but not recorded there — the controller records its own decisions with its `--record`.
 
 ## Transport
 
