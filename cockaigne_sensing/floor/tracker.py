@@ -5,14 +5,15 @@ across cameras. Output: the people list for Contract 1.
 
 The method is the plain one. Each known person is predicted forward along
 their velocity. Sightings are matched to predictions nearest first, within a
-gate. Matched people keep their id and are updated. Unmatched people coast
-for a while and are dropped if unseen for drop_after_s. Leftover sightings
-become new people. Velocity is the smoothed change in position over about a
+gate. Matched people keep their id and are updated. An unmatched person is still
+reported at their predicted position for up to coast_s (their age keeps
+counting), then goes quiet, and is dropped if unseen for drop_after_s.
+Leftover sightings become new people. Velocity is the smoothed change in position over about a
 second. No Kalman filter: the floor is flat and people are slow.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 
 @dataclass
@@ -40,11 +41,13 @@ class Person:
 
 class FloorTracker:
     def __init__(self, merge_distance_m=0.5, drop_after_s=3.0, velocity_window_s=1.0,
-                 gate_m=1.2):
+                 gate_m=1.2, coast_s=1.0, bounds=None):
         self.merge_distance_m = merge_distance_m
         self.drop_after_s = drop_after_s
         self.velocity_window_s = velocity_window_s
         self.gate_m = gate_m
+        self.coast_s = coast_s
+        self.bounds = bounds  # (floor width, floor length); coasted positions stay inside it
         self.people: dict[int, Person] = {}
         self._next_id = 1
 
@@ -103,7 +106,31 @@ class FloorTracker:
         # Drop anyone unseen too long.
         for pid in [pid for pid, p in self.people.items() if t - p.last_seen > self.drop_after_s]:
             del self.people[pid]
-        return [p for p in self.people.values() if t - p.last_seen < 1e-6]
+        # A person missed this step is still reported at their predicted
+        # position for up to coast_s, so a moment of occlusion does not make
+        # them vanish from the people list. Their age keeps counting.
+        out = []
+        for p in self.people.values():
+            unseen = t - p.last_seen
+            if unseen < 1e-6:
+                out.append(p)
+            elif unseen <= self.coast_s:
+                out.append(self._coasted(p, t))
+        return out
+
+    def _coasted(self, p: Person, t: float) -> Person:
+        """A copy of a missed person, carried forward along their velocity.
+
+        The copy is for this step's output only; the stored person stays
+        anchored where they were last seen. Nobody is off the floor, so the
+        prediction is held inside the floor rectangle when its size is known.
+        """
+        dt = t - p.last_seen
+        x, y = p.x + p.vx * dt, p.y + p.vy * dt
+        if self.bounds:
+            x = min(max(x, 0.0), self.bounds[0])
+            y = min(max(y, 0.0), self.bounds[1])
+        return replace(p, x=x, y=y)
 
     def _observe(self, p: Person, t: float, s: Sighting) -> None:
         p.x, p.y = s.x, s.y

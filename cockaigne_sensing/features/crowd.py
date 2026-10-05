@@ -3,10 +3,12 @@
 This file is the arithmetic behind Contract 2. It has no models and no camera
 knowledge; its only input is the people list (Contract 1).
 
-Three relational signals say how much the crowd is acting as a group:
-clustering (gathered more than chance would place them), synchrony (moving the
-same way) and stillness (stopped at the same time). Their geometric mean is
-relational cohesion C, so a low score on any one signal pulls the whole down.
+Three raw signals say how much the crowd is acting as a group: clustering
+(gathered more than chance would place them), synchrony (moving the same way)
+and stillness (stopped at the same time). Synchrony and stillness fold into
+one signal, coordination, because a still crowd and a marching crowd are both
+acting together. The geometric mean of clustering and coordination is
+relational cohesion C, so a low score on either pulls the whole down.
 
 When there is nobody to be relational with, a proxy score A stands in, built
 from each person's time in the room, their stillness, and their distance from
@@ -87,6 +89,17 @@ def stillness_score(people: list[dict], still_speed: float) -> float:
     if not people:
         return 0.0
     return sum(1 for p in people if _speed(p) < still_speed) / len(people)
+
+
+def coordination_score(stillness: float, synchrony: float) -> float:
+    """Stillness and synchrony folded into one signal.
+
+    Everyone still scores 1; everyone moving the same way scores 1; half still
+    and half moving at random scores about 0.5. They began as two separate
+    signals, but the geometric mean punished a still crowd for not marching
+    and a marching crowd for not standing still (DECISIONS.md, 2026-10-05).
+    """
+    return stillness + (1.0 - stillness) * synchrony
 
 
 def spot_score(x: float, y: float, cohesion_cfg: dict) -> float:
@@ -210,14 +223,18 @@ class CrowdState:
         self.n_eff += _alpha(dt, c["occupancy_window_s"]) * (n - self.n_eff)
 
         if n == 0:
-            signals = {"clustering": 0.0, "synchrony": 0.0, "stillness": 0.0}
+            signals = {"clustering": 0.0, "synchrony": 0.0, "stillness": 0.0,
+                       "coordination": 0.0}
             relational = 0.0
         else:
+            stillness = stillness_score(people, c["still_speed_mps"])
+            synchrony = synchrony_score(people, c["still_speed_mps"])
             signals = {
                 "clustering": clustering_score(people, msg["floor"]["w"], msg["floor"]["h"],
                                                c["clustering_zero_at_ratio"]),
-                "synchrony": synchrony_score(people, c["still_speed_mps"]),
-                "stillness": stillness_score(people, c["still_speed_mps"]),
+                "synchrony": synchrony,
+                "stillness": stillness,
+                "coordination": coordination_score(stillness, synchrony),
                 "spare1": 1.0, "spare2": 1.0,
             }
             # A set of one contains no disagreement; the blend weight keeps it
@@ -237,7 +254,7 @@ class CrowdState:
         if self._t_emit is not None and t - self._t_emit < c["crowd_interval_s"]:
             return None
         self._t_emit = t
-        return self._message(t, n, signals, raw, people, labels)
+        return self._message(t, n, signals, relational, raw, people, labels)
 
     def _update_action_rates(self, people: list[dict], dt: float) -> None:
         """Track each action's frequency per person: a short average (the
@@ -250,8 +267,8 @@ class CrowdState:
             r["current"] += _alpha(dt, ac["rate_window_s"]) * (inst - r["current"])
             r["baseline"] += _alpha(dt, ac["baseline_window_s"]) * (inst - r["baseline"])
 
-    def _message(self, t: float, n: int, signals: dict, raw: float,
-                 people: list[dict], labels: dict[int, str]) -> dict:
+    def _message(self, t: float, n: int, signals: dict, relational: float,
+                 raw: float, people: list[dict], labels: dict[int, str]) -> dict:
         moods = {"happy": 0, "sad": 0, "bored": 0, "annoyed": 0}
         for label in labels.values():
             if label in moods:
@@ -270,6 +287,8 @@ class CrowdState:
             "clustering": round(signals["clustering"], 3),
             "synchrony": round(signals["synchrony"], 3),
             "stillness": round(signals["stillness"], 3),
+            "coordination": round(signals["coordination"], 3),
+            "cohesion_relational": round(relational, 3),
             "cohesion_raw": round(raw, 3),
             "cohesion_smooth": round(self.smooth, 3),
             "accumulator": round(self.reservoir.level, 3),

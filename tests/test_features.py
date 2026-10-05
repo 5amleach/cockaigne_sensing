@@ -103,6 +103,26 @@ def test_synchrony_reads_alignment():
     assert synchrony_score([aligned[0], person(2, 3, 3)], 0.15) == 1.0
 
 
+def test_marching_group_scores_high_cohesion():
+    # Four people in a tight group, all pacing the same way at 1 m/s: no one
+    # is still, so coordination must carry what stillness cannot.
+    stage = FeatureStage(load())
+
+    def script(t):
+        leg, phase = divmod(t, 5.0)             # pace 5 s out, 5 s back, together
+        vx = 1.0 if int(leg) % 2 == 0 else -1.0
+        x0 = 1.0 + (phase if vx > 0 else 5.0 - phase)
+        return [person(i, x0 + 0.3 * (i % 2), 3.0 + 0.3 * (i // 2), vx=vx, age=60 + t)
+                for i in range(4)]
+
+    crowds = run_room(stage, script, t1=60.0)
+    last = crowds[-1]
+    assert last["stillness"] < 0.1
+    assert last["coordination"] > 0.95
+    assert last["cohesion_raw"] > 0.7
+    assert last["cohesion_relational"] > 0.7
+
+
 def test_clustering_reads_gathering():
     tight = [person(1, 3.0, 3.5), person(2, 3.4, 3.5)]
     spread = [person(1, 0.5, 0.5), person(2, 5.6, 6.9)]

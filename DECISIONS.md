@@ -51,3 +51,11 @@ Format: date, who decided, the decision, the reason in one or two sentences.
 **2026-10-05 — Claude Code.** The features module is built and replayed over venue clip A (see `bench/2026-10-05-features-on-venue-clip.md`). Three definitional choices, all adjustable in config: clustering scores 0.5 at random spacing and 0 at twice random; synchrony with fewer than two people moving is 1.0, because there is no disagreement to measure; an action's rate is its one-minute average frequency per person divided by its ten-minute baseline, with a small floor under the baseline so a first action in a quiet room reads as a spike rather than infinity.
 
 **2026-10-05 — Claude Code.** Every mood and valence threshold in `config/sensing.yaml` is a starting guess. Arousal is from speed alone for now. The labels are to be treated as provisional until there is footage from the final camera height to tune against; the bench run shows why (valence saturates when a rectangle shrinks for reasons other than slumping).
+
+**2026-10-05 — Claude, review; built by Claude Code.** Stillness and synchrony fold into one relational signal, coordination = stillness + (1 − stillness) × synchrony, before the geometric mean with clustering. Reason: a still crowd and a marching crowd are both acting together, and as separate signals the geometric mean punished each for the other's absence. Contract 2 gains two fields: `coordination`, and `cohesion_relational` carrying relational cohesion C (1.0 for one person, 0.0 for an empty room). The data wall displays `cohesion_relational` as the Coherence Index; `cohesion_raw`, the blend with the proxy score, is what drives the ring. The ring follows the blend, the wall displays the claim.
+
+**2026-10-05 — Claude, review; built by Claude Code.** The floor tracker coasts: a person missed this step is still reported at their predicted position, held inside the floor rectangle, for up to coast_s (1.0 s in config), and their age keeps counting. Reason: a moment of occlusion should not empty the room or flick the headcount.
+
+**2026-10-05 — Sam.** The data wall lists the four moods with a symbol and a count under each. The per-person tally stays.
+
+**2026-10-05 — Sam.** The Festival has confirmed it has no objection to the sensing and the mood display, so no disclosure change is needed from their side.

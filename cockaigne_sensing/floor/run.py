@@ -36,7 +36,8 @@ class FloorStage:
         self.margin = margin_m
         self.bucket_s = bucket_s
         ft = cfg["floor_tracker"]
-        self.tracker = FloorTracker(ft["merge_distance_m"], ft["drop_after_s"], ft["velocity_window_s"])
+        self.tracker = FloorTracker(ft["merge_distance_m"], ft["drop_after_s"], ft["velocity_window_s"],
+                                    coast_s=ft["coast_s"], bounds=(self.W, self.L))
         self.H: dict[str, np.ndarray] = {}
         self.polygon: dict[str, np.ndarray | None] = {}
         for cam in cfg["cameras"]:

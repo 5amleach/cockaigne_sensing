@@ -26,7 +26,9 @@ How it works, in order:
 
 5. Track. A plain constant-velocity tracker keeps one id per person across
    the whole room, predicts where each will be, matches nearest first,
-   drops anyone unseen for drop_after_s. See tracker.py.
+   drops anyone unseen for drop_after_s. A person missed for a moment is
+   still reported at their predicted position for up to coast_s before
+   going quiet, so brief occlusion does not empty the room. See tracker.py.
 
 6. Emit Contract 1 with posture "standing", actions all zero, arousal 0.5
    and valence 0.0. features and actions overwrite those later.

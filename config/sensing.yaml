@@ -35,11 +35,12 @@ floor_tracker:
   merge_distance_m: 0.5   # two floor positions closer than this are the same person
   drop_after_s: 3.0       # a person unseen for this long is removed
   velocity_window_s: 1.0  # velocity is averaged over this window
+  coast_s: 1.0            # a person missed this long is still reported at their predicted position
 
 cohesion:
   smooth_window_s: 10.0   # weighted average window for the raw score
   still_speed_mps: 0.15   # slower than this counts as standing still
-  signals: [clustering, synchrony, stillness]  # relational signals in use; spare1 and spare2 exist in code for more
+  signals: [clustering, coordination]  # relational signals in use; coordination folds stillness and synchrony into one
   clustering_zero_at_ratio: 2.0  # spacing at this multiple of random placement scores 0; random spacing scores 0.5
   crowd_interval_s: 1.0   # how often the crowd state message is emitted
   occupancy_window_s: 10.0   # headcount is smoothed over this before it is used for blending

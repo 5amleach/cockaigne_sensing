@@ -45,12 +45,24 @@ def test_merge_collapses_two_cameras_views_of_one_person():
     assert lead.box_h == 500 and abs(lead.x - 2.1) < 1e-9
 
 
-def test_tracker_drops_the_unseen():
-    tr = FloorTracker(drop_after_s=1.0)
+def test_tracker_coasts_then_goes_quiet_then_drops():
+    tr = FloorTracker(drop_after_s=2.0, coast_s=1.0)
     tr.update(0.0, [Sighting(1, 1, 0.4, 500, 0.9)])
-    assert len(tr.update(0.5, [])) == 0 and len(tr.people) == 1
-    tr.update(2.0, [])
-    assert len(tr.people) == 0
+    assert len(tr.update(0.5, [])) == 1    # within coast_s: still reported
+    assert len(tr.update(1.6, [])) == 0    # past coast_s: quiet, but remembered
+    assert len(tr.people) == 1
+    tr.update(3.0, [])
+    assert len(tr.people) == 0             # past drop_after_s: forgotten
+
+
+def test_coasted_person_moves_along_their_velocity():
+    tr = FloorTracker(coast_s=1.0, bounds=(6.1, 7.4))
+    for i in range(10):  # walking 0.5 m/s along y, last seen at t=1.8, y=1.9
+        tr.update(i * 0.2, [Sighting(3.0, 1.0 + 0.1 * i, 0.4, 600, 0.9)])
+    out = tr.update(2.4, [])  # missed, 0.6 s later
+    assert len(out) == 1
+    assert abs(out[0].x - 3.0) < 0.05 and abs(out[0].y - 2.2) < 0.15
+    assert out[0].first_seen == 0.0  # age keeps counting from the real first sighting
 
 
 def test_stage_drops_feet_that_map_off_the_floor(tmp_path):
