@@ -36,10 +36,12 @@ tests/                  small tests that run without a GPU
 ```
 pip install -e .
 python -m cockaigne_sensing.tools.bench_detect path/to/clip.mkv --out bench/run1
+python -m cockaigne_sensing.floor.run bench/run1/tracks.jsonl --out bench/run1/people.jsonl --config config/venue_bench.yaml
+python -m cockaigne_sensing.tools.plan_view bench/run1/people.jsonl --out bench/run1/plan.png
 ```
 
 That prints how many people were found each second, saves a few annotated frames to look at, and writes the per-camera track messages to a `.jsonl` file that the later modules can replay.
 
 ## Status
 
-19 Sept 2026. Capture and detect exist and have been tested on venue footage (see `bench/2026-09-19-venue-clip.md`). Floor, features, actions and bus are described but not yet written.
+5 Oct 2026. Capture, detect and floor exist and run end to end on the venue footage (see `bench/`). Features and the fake room are being built. Actions and the bus publisher are described but not yet written.

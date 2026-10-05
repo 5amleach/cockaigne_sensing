@@ -2,8 +2,11 @@
 # Code reads it at start-up. Nothing in the code carries its own copy of these values.
 
 floor:
-  width_m: 12.0     # across the room. Replace with the measured figure.
-  length_m: 9.0     # along the room, towards the closed end of the U.
+  # Derived from the venue pixel maps (2.6 mm pitch): the data wall is 2352 px = 6.1 m,
+  # and the U wall is 8064 px = 21.0 m, so each arm is (21.0 - 6.1) / 2 = 7.4 m.
+  # Confirm with a tape measure on site.
+  width_m: 6.1      # along the data wall, x
+  length_m: 7.4     # from the data wall to the closed end of the U, y
 
 cameras:
   # One entry per camera. The password is not stored here: set the environment
@@ -40,7 +43,7 @@ cohesion:
   blend_weight_by_n: [[1, 0.0], [2, 0.5], [3, 0.9], [4, 1.0]]  # weight on relational cohesion vs proxy, by smoothed headcount
   proxy_ceiling: 0.75     # the proxy score can never exceed this; ring_up[3] is above it on purpose
   proxy_dwell_full_s: 120 # dwell counts as full after this long in the room
-  proxy_spot_x_m: 6.0     # viewing spot, metres along the data wall (centre line)
+  proxy_spot_x_m: 3.05    # viewing spot, metres along the data wall (centre line of a 6.1 m floor)
   proxy_spot_y_m: 3.5     # viewing spot, metres out from the data wall into the U
   proxy_spot_full_m: 1.0  # within this distance of the viewing spot, position scores full
   proxy_spot_zero_m: 4.0  # at this distance or further from the viewing spot, position scores zero

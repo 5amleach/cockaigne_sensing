@@ -4,6 +4,7 @@
 *.mkv
 *.mp4
 *.jsonl
+!bench/fixtures/*.jsonl
 bench/out/
 bench/*/snap_*.jpg
 __pycache__/
