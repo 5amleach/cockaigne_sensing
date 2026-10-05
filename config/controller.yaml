@@ -1,0 +1,56 @@
+# Every adjustable number in the controller lives in this file.
+# Code reads it at start-up. Nothing in the code carries its own copy of these values.
+
+bus:
+  url: ws://127.0.0.1:8765   # the sensing bus; the controller is one client among the others
+
+resolume:
+  host: 127.0.0.1
+  osc_port: 7000      # clips are fired over OSC on UDP
+  rest_port: 8080     # the composition (the clip names) is read over REST at start-up
+  video_layer: 1      # the layer holding the landscape clips
+  audio_bank_a: [2, 3, 4, 5]   # four stem layers, bank A
+  audio_bank_b: [6, 7, 8, 9]   # four stem layers, bank B; two banks so an arm change can crossfade
+
+clock:
+  clip_s: 60.0        # every clip is this long; the controller fires the next on its own clock
+  audio_lead_s: 5.0   # stems for the next arm start this long before the video
+
+map:
+  # Arm letters confirmed by Sam, 5 October 2026. c (Cargo) is to be
+  # confirmed against the clip files.
+  arms: {a: architecture, u: furniture, s: storm, r: rivers, f: feast, h: herd, m: machinery, c: cargo}
+  rings: 4
+
+controller:
+  default_arm: machinery   # the fixed arm for the ring-only loop (build step 3); the bandit replaces it
+  tick_s: 0.1              # how often the loop checks its clock
+
+occupancy:
+  smooth_window_s: 10.0    # the controller smooths the headcount itself; Contract 2 carries only n
+  bands: [[1, solo], [2, small], [6, medium], [16, large]]  # lower edge of each band, by smoothed headcount
+  band_size: {solo: 1, small: 3, medium: 10, large: 20}     # a typical headcount per band; divides the action bias
+
+bandit:
+  reward_delay_s: 10.0  # reward is the cohesion_smooth change from this long after clip start to clip end
+  reward_scale: 0.15    # a change of +this much scores 1.0 and -this much scores 0.0; 0 change scores 0.5
+
+action_bias:
+  half_life_s: 90       # the lean decays with this half-life after the excess was last seen
+  targets: {sitting: furniture, phone: machinery, drink: rivers, eat: feast}
+  weights: {sitting: 0.25, phone: 0.25, drink: 0.25, eat: 0.25}   # starting guesses, tune on site
+  sitting_baseline_s: 600    # sitting has no rate in Contract 2, so the controller keeps its own baseline
+  sitting_baseline_floor: 0.02  # the baseline is never below this, so a first sitter reads as a spike, not infinity
+
+personalities:
+  # prior_strength is how many pseudo-observations the day starts with: low commits fast.
+  # storm_prior is Storm's prior mean (risk appetite); every other arm starts at 0.5.
+  # reward_scale and patience_s override the bandit section for the day.
+  # All four parameter sets are starting guesses, to be tuned with real crowds.
+  Courtier:   {prior_strength: 2,  storm_prior: 0.3,  reward_scale: 0.10, patience_s: 10}
+  Operator:   {prior_strength: 6,  storm_prior: 0.5,  reward_scale: 0.15, patience_s: 15}
+  Accountant: {prior_strength: 12, storm_prior: 0.35, reward_scale: 0.20, patience_s: 20}
+  Naif:       {prior_strength: 1,  storm_prior: 0.65, reward_scale: 0.08, patience_s: 8}
+personality_order: [Courtier, Operator, Accountant, Naif]  # the day of the year, modulo four, picks the day
+
+ledger_path: ledger.jsonl   # the same file the sensing bus writes; the controller appends decision and outcome
