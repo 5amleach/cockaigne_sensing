@@ -18,6 +18,30 @@ def crowd(t, n=4, sitting=0, **rates):
     return {"t": t, "n": n, "action_rates": base, "actions": {"sitting": sitting}}
 
 
+def test_day_change_clears_the_pending_reward_and_the_lean():
+    import datetime
+    from tests.test_controller import full_pool, ARMS as ARM_LETTERS, crowd as crowd_msg
+    from cockaigne_controller.clipmap import ClipMap
+    from cockaigne_controller.config import load
+    from cockaigne_controller.loop import Controller
+
+    cfg = load()
+    cfg["action_bias"]["baseline_warmup_s"] = 0   # skip the warm-up for this test
+    names = full_pool()
+    layout = {n: (1, i) for i, n in enumerate(names, start=1)}
+    c = Controller(cfg, ClipMap(names, ARM_LETTERS), layout, rng=random.Random(2))
+    c.ensure_day(datetime.date(2026, 1, 15))
+    c.observe(crowd_msg(59.0, 2, cohesion=0.4))
+    d, _ = c.decide(60.0)
+    c.confirm_fired(d, 60.0)
+    assert c._pending_reward is not None
+    c.ensure_day(datetime.date(2026, 1, 16))      # midnight passes mid-clip
+    assert c._pending_reward is None              # yesterday's clip does not teach today
+    c.settle_reward()
+    assert c.last_outcome is None
+    assert all(v == 0.0 for v in c.action_bias.level.values())
+
+
 def test_reward_maps_cohesion_change_around_a_half():
     assert reward_from_delta(0.0, 0.15) == 0.5
     assert reward_from_delta(0.15, 0.15) == 1.0
@@ -53,27 +77,57 @@ def test_bias_leans_on_close_calls_but_cannot_overturn_conviction():
     assert picks.count("feast") > 45
 
 
-def test_action_bias_decays_with_a_90_second_half_life():
-    bias = ActionBias({"half_life_s": 90, "targets": {"phone": "machinery"},
-                       "weights": {"phone": 0.25}, "sitting_baseline_s": 600,
-                       "sitting_baseline_floor": 0.02},
-                      {"small": 3})
-    bias.observe(crowd(0.0, phone=3.0))     # excess 2.0
-    assert bias.bias("small")["machinery"] == pytest.approx(0.25 * 2.0 / 3)
-    bias.observe(crowd(90.0))               # back to normal, one half-life later
-    assert bias.bias("small")["machinery"] == pytest.approx(0.25 * 1.0 / 3)
+def bias_cfg(**over):
+    cfg = {"half_life_s": 90, "targets": {"phone": "machinery", "sitting": "furniture"},
+           "weights": {"phone": 0.25, "sitting": 0.25}, "sitting_baseline_s": 600,
+           "sitting_baseline_floor": 0.02, "lean_cap": 0.5, "rate_cap": 5.0,
+           "baseline_warmup_s": 600}
+    cfg.update(over)
+    return cfg
+
+
+def warmed(bias, until_t=600.0):
+    """Feed quiet history until the baselines are old enough to trust."""
+    t = 0.0
+    while t <= until_t:
+        bias.observe(crowd(t), now=t)
+        t += 10.0
+    return t
+
+
+def test_action_bias_decays_on_the_controllers_clock():
+    bias = ActionBias(bias_cfg(), {"small": 3})
+    t = warmed(bias)
+    bias.observe(crowd(t, phone=3.0), now=t)        # excess 2.0 seen now
+    assert bias.bias("small", t)["machinery"] == pytest.approx(0.25 * 2.0 / 3)
+    # No further messages at all: the lean still halves after one half-life.
+    assert bias.bias("small", t + 90.0)["machinery"] == pytest.approx(0.25 * 1.0 / 3)
+
+
+def test_rates_are_treated_as_normal_until_the_baseline_is_warm():
+    bias = ActionBias(bias_cfg(), {"solo": 1})
+    bias.observe(crowd(0.0, n=1, sitting=1), now=0.0)   # the audit's first sitter
+    assert bias.bias("solo", 0.0).get("furniture", 0.0) == 0.0
+    t = warmed(bias)
+    bias.observe(crowd(t, n=1, sitting=1), now=t)       # now the spike is real...
+    lean = bias.bias("solo", t)["furniture"]
+    assert lean == pytest.approx(0.5)                   # ...and capped at half a draw
+
+
+def test_rates_are_capped():
+    bias = ActionBias(bias_cfg(), {"medium": 10})
+    t = warmed(bias)
+    bias.observe(crowd(t, phone=50.0), now=t)           # an absurd reported rate
+    # rate capped at 5: excess 4, weight 0.25, band size 10.
+    assert bias.bias("medium", t)["machinery"] == pytest.approx(0.25 * 4.0 / 10)
 
 
 def test_sitting_rate_is_derived_against_its_own_baseline():
-    cfg = {"half_life_s": 90, "targets": {"sitting": "furniture"},
-           "weights": {"sitting": 0.25}, "sitting_baseline_s": 600,
-           "sitting_baseline_floor": 0.02}
-    bias = ActionBias(cfg, {"small": 3})
-    for i in range(60):                     # a minute of nobody sitting
-        bias.observe(crowd(float(i)))
-    assert bias.bias("small").get("furniture", 0.0) == 0.0
-    bias.observe(crowd(60.0, n=4, sitting=2))  # half the room sits down
-    assert bias.bias("small")["furniture"] > 0.5
+    bias = ActionBias(bias_cfg(), {"small": 3})
+    t = warmed(bias)                                    # a long time with nobody sitting
+    assert bias.bias("small", t).get("furniture", 0.0) == 0.0
+    bias.observe(crowd(t + 1.0, n=4, sitting=2), now=t + 1.0)  # half the room sits down
+    assert bias.bias("small", t + 1.0)["furniture"] > 0.2
 
 
 def test_personality_follows_the_date_and_sets_the_priors():
@@ -143,12 +197,18 @@ def test_reward_flows_from_cohesion_into_the_belief():
     c.observe(crowd_msg(59.0, 2, cohesion=0.40))
     d, _ = c.decide(60.0)                 # the bandit picks some arm
     assert d["personality"] is not None
-    c.fired(60.0)
+    c.confirm_fired(d, 60.0)              # only a confirmed clip earns anything
     arm, context = d["arm"], d["context"]
     before = c.bandit.beliefs[(context, arm)].a
     c.observe(crowd_msg(60.0 + c.patience, 2, cohesion=0.40))   # window opens
-    c.observe(crowd_msg(119.0, 2, cohesion=0.60))               # cohesion rose
-    c.decide(120.0)                       # next decision settles the reward
+    c.observe(crowd_msg(119.9, 2, cohesion=0.60))               # cohesion rose
+    c.settle_reward()                     # run.py settles at the next fire
     assert c.last_outcome["arm"] == arm
     assert c.last_outcome["reward"] == 1.0   # +0.2 >> reward scale
     assert c.bandit.beliefs[(context, arm)].a == pytest.approx(before + 1.0)
+    # An unconfirmed clip leaves no pending reward to settle.
+    c.last_outcome = None
+    c.observe(crowd_msg(179.0, 2, cohesion=0.60))
+    c.decide(180.0)                       # decided, fired, never confirmed
+    c.settle_reward()
+    assert c.last_outcome is None

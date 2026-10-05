@@ -21,6 +21,11 @@ def node_name(arm_letter: str, ring: int) -> str:
     return BARREN if ring == 0 else f"{arm_letter}{ring}"
 
 
+def node_ring(node: str) -> int:
+    """The ring a node sits on; Barren counts as 0."""
+    return 0 if node == BARREN else int(node[1])
+
+
 def _take_node(s: str, arms: dict, rings: int) -> tuple[str, str] | None:
     """Read one node from the front of s. Returns (node, rest) or None."""
     if s.startswith(BARREN):
@@ -93,21 +98,50 @@ class ClipMap:
                 queue.append((nxt, hop))
         return None
 
-    def missing(self) -> list[str]:
-        """What a complete pool must have but this one does not, in plain words.
+    def next_step_on_ring(self, frm: str, to: str, ring: int) -> str | None:
+        """The first hop of the shortest path that never leaves this ring.
+        None when no such path exists."""
+        if frm == to:
+            return to
+        seen = {frm}
+        queue = deque([(frm, None)])
+        while queue:
+            node, first = queue.popleft()
+            for nxt in self.neighbours(node):
+                if nxt in seen or node_ring(nxt) != ring:
+                    continue
+                hop = first or nxt
+                if nxt == to:
+                    return hop
+                seen.add(nxt)
+                queue.append((nxt, hop))
+        return None
 
-        Required: a loop clip for every Ring 4 node, a direct collapse clip
-        to Barren from every Ring 2 and Ring 3 node, and a route between
-        every pair of nodes through the clips that exist.
+    def missing(self) -> list[str]:
+        """What a complete pool must have but this one does not, in plain
+        words. The controller checks this once at start-up and refuses to
+        run while the list is not empty, so every move it can ever ask for
+        is known to exist: Barren out to every Ring 1 node, a loop for every
+        top-ring node, a ring-preserving route between every pair of arms on
+        every ring (holding a ring never leaves it), the direct collapses
+        from the middle rings, and a route between every pair of nodes.
         """
         problems = []
         for a in self.arms:
-            node = node_name(a, 4)
-            if node not in self.loops:
-                problems.append(f"no loop clip for {node}")
-            for r in (2, 3):
+            if (BARREN, node_name(a, 1)) not in self.moves:
+                problems.append(f"no clip from {BARREN} to {node_name(a, 1)} (Barren probe)")
+            if node_name(a, self.rings) not in self.loops:
+                problems.append(f"no loop clip for {node_name(a, self.rings)}")
+            for r in range(2, self.rings):
                 if (node_name(a, r), BARREN) not in self.moves:
                     problems.append(f"no collapse clip {node_name(a, r)} to {BARREN}")
+        for r in range(1, self.rings + 1):
+            for x in self.arms:
+                stuck = [y for y in self.arms if y != x and self.next_step_on_ring(
+                    node_name(x, r), node_name(y, r), r) is None]
+                if stuck:
+                    problems.append(f"no ring-preserving route from {node_name(x, r)} to "
+                                    + ", ".join(node_name(y, r) for y in stuck))
         for frm in self.nodes():
             unreachable = [to for to in self.nodes()
                            if to != frm and self.next_step(frm, to) is None]

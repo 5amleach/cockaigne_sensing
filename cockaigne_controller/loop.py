@@ -1,22 +1,22 @@
 """The decision logic: crowd state in, one clip decision per cycle out.
 
-Every clip length (60 seconds) the controller decides where the wall goes
-next. The ring comes from `ring_target` in the latest crowd state and
-nothing else. The arm comes from the bandit: a Thompson draw per arm in the
-current occupancy band, plus the action lean. Setting controller.arm_chooser
-to "fixed" pins the arm from config instead, which is how the ring
-mechanics are tested and how one arm can be soaked on site.
+The controller keeps two positions. `displayed` is where the wall actually
+is: it advances only when a fire was confirmed (or sent, when there is no
+REST to ask). A decision is a plan; routing, holding and the blind descent
+all start from `displayed`, so a failed fire is retried from reality rather
+than from an imagined position.
 
-Holding a ring is a sideways move: Rings 1 to 3 have no loop clips, so
-staying at a ring goes to the chosen arm at the same ring (the runner-up
-when the chooser picked the arm the wall is already on), reason "lateral".
-Loops play only where loop clips exist, Ring 4 and Barren; Barren without
-a loop probes out to Ring 1 and returns.
+The ring comes from `ring_target` in the latest crowd state. The arm comes
+from the bandit (controller.arm_chooser "fixed" pins it instead). Holding a
+ring never leaves the ring: a loop clip where one exists, otherwise a
+sideways move to another arm along ring-preserving clips. Barren probes out
+to Ring 1 and returns.
 
-If no crowd message has arrived for blind_after_s, the controller is
-running blind: it keeps cycling on its own clock and steps the ring down
-by one each cycle until Barren. Each day starts with a personality: the
-beliefs reset to its priors and the ledger notes who woke up.
+Freshness is the crowd message's own clock: if `t` has not advanced for
+blind_after_s on the controller's clock, the controller is blind and steps
+the displayed position's ring down by one each cycle, along the displayed
+arm, until Barren. The day's personality resets the beliefs, the pending
+reward and the action lean; the ledger is never reset.
 
 This file holds the logic only; the live loop around it is run.py.
 """
@@ -26,16 +26,13 @@ import datetime
 import random
 
 from .bandit import ActionBias, Bandit, reward_from_delta
-from .clipmap import BARREN, ClipMap, node_name
+from .clipmap import BARREN, ClipMap, node_name, node_ring
 from .personality import personality_for, priors
 
 
 class Controller:
-    """Holds the wall's position and turns crowd state into decisions.
-
-    decide() is bookkeeping plus the map: it never touches the network, so
-    the tests drive it directly with made-up times.
-    """
+    """Turns crowd state into decisions. decide() never touches the network
+    and never advances `displayed`; run.py confirms fires."""
 
     def __init__(self, cfg: dict, clipmap: ClipMap, layout: dict,
                  rng: random.Random | None = None):
@@ -43,12 +40,13 @@ class Controller:
         self.map = clipmap
         self.layout = layout
         self.arms = cfg["map"]["arms"]
-        self.node = BARREN
+        self.displayed = BARREN     # what the wall shows, as far as we know
         self.ring = 0
         self.n = 0
         self.n_smooth = 0.0
         self.cohesion = 0.0
-        self.last_crowd: float | None = None
+        self._last_msg_t = float("-inf")
+        self._fresh_at: float | None = None
         self.rng = rng or random.Random()
         contexts = [name for _, name in cfg["occupancy"]["bands"]]
         self.bandit = Bandit(list(self.arms.values()), contexts, self.rng)
@@ -59,31 +57,29 @@ class Controller:
         self._day: datetime.date | None = None
         self._pending_reward: dict | None = None
         self.last_outcome: dict | None = None
+        self.warnings: list[str] = []   # run.py drains these into the log
 
     # --- crowd state ---
 
     def observe(self, crowd: dict, now: float | None = None) -> None:
-        """A crowd message arrived. `now` is the controller's own clock at
-        receipt; it defaults to the message's t, which is the same clock
-        when sensing runs live on this machine, but differs under replay."""
+        """One validated crowd message. `now` is the controller's own clock;
+        it defaults to the message's t, the same clock when sensing runs live
+        on this machine. Freshness requires the message's own t to advance."""
+        now = crowd["t"] if now is None else now
         self.ring = crowd["ring_target"]
         self.n = crowd["n"]
-        # Smoothing happens once, in features; old recordings without
-        # n_smooth fall back to the raw headcount.
         self.n_smooth = crowd.get("n_smooth", crowd["n"])
         self.cohesion = crowd["cohesion_smooth"]
-        self.action_bias.observe(crowd)
-        now = crowd["t"] if now is None else now
-        self.last_crowd = now
-        # The reward window opens patience seconds into the clip: remember
-        # the cohesion there, so the clip is judged on what followed it.
+        self.action_bias.observe(crowd, now)
+        if crowd["t"] > self._last_msg_t:
+            self._last_msg_t = crowd["t"]
+            self._fresh_at = now
+        # The reward window opens patience seconds into the clip.
         p = self._pending_reward
-        if p and p.get("t_fired") is not None and p["c_start"] is None \
-                and now >= p["t_fired"] + self.patience:
+        if p and p["c_start"] is None and now >= p["t_fired"] + self.patience:
             p["c_start"] = self.cohesion
 
     def context(self) -> str:
-        """The occupancy band, from the crowd state's smoothed headcount."""
         band = self.cfg["occupancy"]["bands"][0][1]
         for edge, name in self.cfg["occupancy"]["bands"]:
             if self.n_smooth >= edge:
@@ -91,15 +87,16 @@ class Controller:
         return band
 
     def is_blind(self, now: float) -> bool:
-        """True when the sensing side has gone quiet."""
-        return (self.last_crowd is None
-                or now - self.last_crowd > self.cfg["controller"]["blind_after_s"])
+        """True when no crowd message with an advancing clock has arrived
+        for blind_after_s: a repeated or stale message does not count."""
+        return (self._fresh_at is None
+                or now - self._fresh_at > self.cfg["controller"]["blind_after_s"])
 
     # --- the day ---
 
     def ensure_day(self, date: datetime.date, ledger=None) -> None:
-        """At day start: pick the personality, reset the beliefs to its
-        priors, note it in the ledger. The ledger itself is never reset."""
+        """At day start: new personality, beliefs reset to its priors, the
+        pending reward and the action lean cleared. The ledger is never reset."""
         if date == self._day:
             return
         self._day = date
@@ -108,21 +105,27 @@ class Controller:
         self.reward_scale = params["reward_scale"]
         self.patience = params["patience_s"]
         self.bandit.reset(priors(params, list(self.arms.values())))
+        self._pending_reward = None
+        self.action_bias.clear()
         if ledger:
             ledger.append("day_start", personality=name)
 
-    # --- the reward for the clip just played ---
+    # --- fires and rewards ---
 
-    def fired(self, t: float) -> None:
-        """The loop calls this at the moment the clip actually starts."""
-        if self._pending_reward:
-            self._pending_reward["t_fired"] = t
+    def confirm_fired(self, decision: dict, t: float) -> None:
+        """The clip is confirmed showing: the wall is now at its destination,
+        and the clip starts earning its reward."""
+        self.displayed = decision["to"]
+        self._pending_reward = {"arm": decision["arm"], "context": decision["context"],
+                                "t_fired": t, "c_start": None}
 
-    def _settle_reward(self) -> None:
-        """The clip is over: judge it by how cohesion moved and update the
-        belief it was drawn from. Barren is nobody's arm and gets none."""
+    def settle_reward(self) -> None:
+        """Called at the moment the next clip fires, so the whole clip counts:
+        the reward is the cohesion now against cohesion when the window
+        opened. Barren is nobody's arm; an unconfirmed clip never had a
+        pending reward to settle."""
         p, self._pending_reward = self._pending_reward, None
-        if not p or p["arm"] == "barren" or p.get("c_start") is None:
+        if not p or p["arm"] == "barren" or p["c_start"] is None:
             return
         delta = self.cohesion - p["c_start"]
         reward = reward_from_delta(delta, self.reward_scale)
@@ -132,7 +135,7 @@ class Controller:
 
     # --- choosing ---
 
-    def ranked_arms(self) -> tuple[list[str], str]:
+    def ranked_arms(self, now: float) -> tuple[list[str], str]:
         """Arm letters in order of preference, and the chooser's reason."""
         if self.cfg["controller"]["arm_chooser"] == "fixed":
             wanted = self.cfg["controller"]["default_arm"]
@@ -140,42 +143,58 @@ class Controller:
             reason = "ring"
         else:
             context = self.context()
-            order, reason = self.bandit.rank(context, self.action_bias.bias(context))
+            order, reason = self.bandit.rank(context, self.action_bias.bias(context, now))
         by_name = {name: letter for letter, name in self.arms.items()}
         return [by_name[name] for name in order], reason
 
+    def _hold(self, frm: str, ranked: list[str]) -> tuple[str, str]:
+        """Spend a cycle without leaving the node's ring: the loop clip where
+        one exists, otherwise sideways to another arm along this ring."""
+        if self.map.clip_for(frm, frm):
+            return frm, "loop"
+        if frm == BARREN:
+            return node_name(ranked[0], 1), "probe"
+        ring = node_ring(frm)
+        lateral_letter = next(l for l in ranked if l != frm[0])
+        lateral = node_name(lateral_letter, ring)
+        if self.map.clip_for(frm, lateral):
+            return lateral, "lateral"
+        step = self.map.next_step_on_ring(frm, lateral, ring)
+        if step is not None:
+            return step, "lateral"
+        # A validated pool cannot reach here; say so and stay as close as we can.
+        self.warnings.append(f"no ring-preserving move from {frm}; leaving the ring")
+        return self.map.next_step(frm, lateral) or frm, "lateral"
+
     def decide(self, t: float) -> tuple[dict, tuple[int, int]]:
-        """One decision: the Contract 3 message and the (layer, index) to fire."""
-        self._settle_reward()
+        """One plan: the Contract 3 message and the (layer, index) to fire.
+        The wall's position is advanced by confirm_fired(), not here."""
+        frm = self.displayed
+        ranked, base_reason = self.ranked_arms(t)
         if self.is_blind(t):
-            self.ring = max(0, self.ring - 1)  # run.py logs the blindness
-        ranked, base_reason = self.ranked_arms()
-        arm_letter = ranked[0]
-        # Staying in the current arm while the ring moves is a ring story,
-        # whatever the chooser said; its reason belongs to arm changes.
-        if self.node != BARREN and self.node[0] == arm_letter:
+            # Step down from where the wall actually is, along its own arm.
+            self.ring = max(0, node_ring(frm) - 1)
+            arm_letter = frm[0] if frm != BARREN else ranked[0]
             base_reason = "ring"
+        else:
+            arm_letter = ranked[0]
+            if frm != BARREN and frm[0] == arm_letter:
+                base_reason = "ring"
         target = BARREN if self.ring == 0 else node_name(arm_letter, self.ring)
-        frm = self.node
         if target == frm:
-            if self.map.clip_for(frm, frm):
-                to, reason = frm, "loop"
-            elif frm == BARREN:
-                to, reason = node_name(arm_letter, 1), "probe"
-            else:
-                # Holding a ring is a sideways move to another arm.
-                lateral_letter = next(l for l in ranked if l != frm[0])
-                lateral = node_name(lateral_letter, int(frm[1]))
-                to = lateral if self.map.clip_for(frm, lateral) \
-                    else self.map.next_step(frm, lateral)
-                reason = "lateral"
+            to, reason = self._hold(frm, ranked)
         elif self.map.clip_for(frm, target):
             to, reason = target, base_reason
         else:
             to, reason = self.map.next_step(frm, target), "path"
-        clip = self.map.clip_for(frm, to)
+        clip = self.map.clip_for(frm, to) if to else None
+        if clip is None:
+            # A validated pool cannot reach here either; take any way out
+            # rather than crash the show.
+            self.warnings.append(f"no clip from {frm} toward {to or target}; improvising")
+            to = self.map.neighbours(frm)[0]
+            clip, reason = self.map.clip_for(frm, to), "path"
         layer, index = self.layout[clip]
-        self.node = to
         arm_name = "barren" if to == BARREN else self.arms[to[0]]
         decision = {
             "stream": "decision", "t": round(t, 2),
@@ -184,6 +203,4 @@ class Controller:
             "context": self.context(), "ring_target": self.ring,
             "personality": self.personality,
         }
-        self._pending_reward = {"arm": arm_name, "context": decision["context"],
-                                "t_fired": None, "c_start": None}
         return decision, (layer, index)

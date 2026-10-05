@@ -64,8 +64,18 @@ class Resolume:
         r.raise_for_status()
         return connected_from_layer(r.json())
 
-    def fire_clip(self, layer: int, index: int) -> None:
-        self._osc.send_message(f"/composition/layers/{layer}/clips/{index}/connect", 1)
+    def fire_clip(self, layer: int, index: int) -> bool:
+        """Send the connect message. Never raises; says whether it was sent."""
+        try:
+            self._osc.send_message(f"/composition/layers/{layer}/clips/{index}/connect", 1)
+            return True
+        except Exception:
+            return False
 
-    def set_volume(self, layer: int, volume: float) -> None:
-        self._osc.send_message(f"/composition/layers/{layer}/audio/volume", float(volume))
+    def set_volume(self, layer: int, volume: float) -> bool:
+        """Send a volume change. Never raises; says whether it was sent."""
+        try:
+            self._osc.send_message(f"/composition/layers/{layer}/audio/volume", float(volume))
+            return True
+        except Exception:
+            return False

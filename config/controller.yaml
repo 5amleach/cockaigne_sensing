@@ -41,7 +41,10 @@ bandit:
   reward_scale: 0.15    # a change of +this much scores 1.0 and -this much scores 0.0; 0 change scores 0.5
 
 action_bias:
-  half_life_s: 90       # the lean decays with this half-life after the excess was last seen
+  half_life_s: 90       # the lean decays with this half-life on the controller's clock
+  lean_cap: 0.5         # the final lean per arm can never exceed half a Thompson draw
+  rate_cap: 5.0         # a reported action rate above this is treated as this
+  baseline_warmup_s: 600  # rates are treated as normal (1.0) until this much crowd history exists
   targets: {sitting: furniture, phone: machinery, drink: rivers, eat: feast}
   weights: {sitting: 0.25, phone: 0.25, drink: 0.25, eat: 0.25}   # starting guesses, tune on site
   sitting_baseline_s: 600    # sitting has no rate in Contract 2, so the controller keeps its own baseline

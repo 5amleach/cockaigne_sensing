@@ -2,7 +2,7 @@
 ring-only loop. One OSC loopback test; everything else stays off the network."""
 import pytest
 
-from cockaigne_controller.clipmap import BARREN, ClipMap, parse_clip_name
+from cockaigne_controller.clipmap import BARREN, ClipMap, node_ring, parse_clip_name
 from cockaigne_controller.clock import ClipClock
 from cockaigne_controller.config import load
 from cockaigne_controller.loop import Controller
@@ -23,9 +23,16 @@ def full_pool():
         for r in (1, 2, 3):
             names += [f"{a}{r}{a}{r + 1}", f"{a}{r + 1}{a}{r}"]
         nxt = letters[(i + 1) % len(letters)]
-        for r in (1, 2, 3):
+        for r in (1, 2, 3, 4):
             names += [f"{a}{r}{nxt}{r}", f"{nxt}{r}{a}{r}"]
     return names
+
+
+def step(c, t):
+    """Decide and confirm the fire, as run.py does on a healthy Resolume."""
+    d, li = c.decide(t)
+    c.confirm_fired(d, t)
+    return d
 
 
 def make_controller(pool=None, **cfg_over):
@@ -63,6 +70,17 @@ def test_map_reports_what_is_missing():
             if (parse_clip_name(n, ARMS, 4) or ("", ""))[1] != "c1"]
     problems = ClipMap(pool, ARMS).missing()
     assert any("no route" in p and "c1" in p for p in problems)
+    # The pool that once crashed a Barren probe is now refused at start-up.
+    pool = [n for n in full_pool() if n not in ("b_b", "b_m1")]
+    problems = ClipMap(pool, ARMS).missing()
+    assert any("b to m1" in p and "probe" in p for p in problems)
+    # An arm cut off from its ring neighbours is a ring-preserving gap.
+    pool = [n for n in full_pool()
+            if not (parse_clip_name(n, ARMS, 4)
+                    and {parse_clip_name(n, ARMS, 4)[0][1:], parse_clip_name(n, ARMS, 4)[1][1:]} == {"2"}
+                    and "s2" in (parse_clip_name(n, ARMS, 4)))]
+    problems = ClipMap(pool, ARMS).missing()
+    assert any("ring-preserving" in p and "s2" in p for p in problems)
 
 
 def test_shortest_path_steps_through_existing_clips():
@@ -76,27 +94,27 @@ def test_shortest_path_steps_through_existing_clips():
 def test_ring_only_loop_climbs_and_collapses():
     c = make_controller(default_arm="machinery")
     c.observe(crowd(59.0, 1))
-    d, _ = c.decide(60.0)
+    d = step(c, 60.0)
     assert (d["from"], d["to"], d["reason"]) == ("b", "m1", "ring")
     c.observe(crowd(119.0, 3))
-    d, _ = c.decide(120.0)
+    d = step(c, 120.0)
     assert (d["to"], d["reason"]) == ("m2", "path")   # no m1 -> m3 clip: step
     c.observe(crowd(179.0, 3))
-    d, _ = c.decide(180.0)
+    d = step(c, 180.0)
     assert (d["to"], d["reason"]) == ("m3", "ring")
     c.observe(crowd(239.0, 0))
-    d, _ = c.decide(240.0)
+    d = step(c, 240.0)
     assert (d["to"], d["clip"], d["arm"]) == ("b", "m3b", "barren")  # direct collapse
 
 
 def climb_to(c, ring, t0=60.0):
-    """Walk the controller to machinery at this ring, fresh crowd each cycle.
-    Returns at the moment of arrival, before any staying-put decision."""
+    """Walk the controller to machinery at this ring, fresh crowd and a
+    confirmed fire each cycle. Returns at the moment of arrival."""
     goal = "b" if ring == 0 else f"m{ring}"
     t = t0
     for _ in range(12):
         c.observe(crowd(t - 1.0, ring))
-        d, _ = c.decide(t)
+        d = step(c, t)
         t += 60.0
         if d["to"] == goal:
             return d, t
@@ -107,45 +125,77 @@ def test_staying_put_loops_probes_or_moves_sideways():
     # Barren with a loop clip loops.
     c = make_controller()
     c.observe(crowd(59.0, 0))
-    d, _ = c.decide(60.0)
+    d = step(c, 60.0)
     assert (d["to"], d["reason"], d["clip"]) == ("b", "loop", "b_b")
     # Without a Barren loop clip, Barren probes out to Ring 1 and returns.
     c = make_controller(pool=[n for n in full_pool() if n != "b_b"])
     c.observe(crowd(59.0, 0))
-    d, _ = c.decide(60.0)
+    d = step(c, 60.0)
     assert (d["to"], d["reason"]) == ("m1", "probe")
     c.observe(crowd(119.0, 0))
-    d, _ = c.decide(120.0)
+    d = step(c, 120.0)
     assert (d["to"], d["reason"]) == ("b", "ring")
-    # Holding Ring 3 is a sideways move: same ring, another arm, and back.
+    # Holding Ring 3 is a sideways move that never leaves the ring.
     c = make_controller()
     _, t = climb_to(c, 3)
     c.observe(crowd(t - 1.0, 3))
-    d, _ = c.decide(t)
+    d = step(c, t)
     assert d["reason"] == "lateral"
-    assert d["from"] == "m3" and d["to"].endswith("3") and d["to"] != "m3"
+    assert d["from"] == "m3" and node_ring(d["to"]) == 3 and d["to"] != "m3"
     c.observe(crowd(t + 59.0, 3))
-    d, _ = c.decide(t + 60.0)
+    d = step(c, t + 60.0)
     assert (d["to"], d["reason"]) == ("m3", "ring")   # the fixed arm pulls it home
     # Ring 4 has a loop and uses it.
     c = make_controller()
     _, t = climb_to(c, 4)
     c.observe(crowd(t - 1.0, 4))
-    d, _ = c.decide(t)
+    d = step(c, t)
     assert (d["from"], d["to"], d["reason"]) == ("m4", "m4", "loop")
 
 
 def test_blind_controller_steps_down_to_barren():
     c = make_controller()
-    climb_to(c, 3)
-    last = c.last_crowd
+    _, t0 = climb_to(c, 3)
     walk = []
     for i in range(4):          # sensing has gone quiet; the clock keeps going
-        t = last + 60.0 * (i + 1)
+        t = t0 + 60.0 * (i + 1)
         assert c.is_blind(t)
-        d, _ = c.decide(t)
+        d = step(c, t)
         walk.append((d["to"], d["ring_target"]))
     assert walk == [("m2", 2), ("m1", 1), ("b", 0), ("b", 0)]
+
+
+def test_blind_descent_starts_from_the_displayed_position():
+    # The audit's reproduction: wall at m1, last request Ring 4, sensing dies.
+    # The old code climbed to m2; the descent must follow the wall, not the wish.
+    c = make_controller()
+    c.observe(crowd(59.0, 4))
+    d = step(c, 60.0)                 # first hop toward ring 4
+    assert d["to"] == "m1"
+    d = step(c, 120.0)                # silence since t=59: blind
+    assert (d["to"], d["ring_target"]) == ("b", 0)
+
+
+def test_stale_crowd_time_counts_as_blind():
+    # The same message replayed with fresh receipt times is not freshness.
+    c = make_controller()
+    c.observe(crowd(10.0, 2), now=10.0)
+    assert not c.is_blind(20.0)
+    for receipt in (50.0, 80.0, 110.0):
+        c.observe(crowd(10.0, 2), now=receipt)   # t never advances
+    assert c.is_blind(110.0)
+
+
+def test_unconfirmed_fire_keeps_the_displayed_position():
+    c = make_controller()
+    c.observe(crowd(59.0, 1))
+    d1, _ = c.decide(60.0)            # fired, but Resolume never confirmed
+    assert c.displayed == "b"
+    c.observe(crowd(119.0, 1))
+    d2, _ = c.decide(120.0)           # the retry plans from reality
+    assert (d2["from"], d2["to"]) == (d1["from"], d1["to"])
+    c.confirm_fired(d2, 120.0)
+    assert c.displayed == "m1"
 
 
 def test_clock_fires_audio_lead_then_clip():
@@ -219,11 +269,12 @@ def test_fire_is_confirmed_retried_once_and_never_raises():
             self.fires = 0
         def fire_clip(self, layer, index):
             self.fires += 1
+            return True
         def connected_clip(self, layer):
             return 3 if self.fires >= 2 else 5   # right only after the retry
 
     stub = WrongUntilRefired()
-    asyncio.run(fire_confirmed(stub, 1, 3, log, confirm_s=0.1, poll_s=0.02))
+    assert asyncio.run(fire_confirmed(stub, 1, 3, log, confirm_s=0.1, poll_s=0.02))
     assert stub.fires == 2
 
     class NoRest(WrongUntilRefired):
@@ -231,16 +282,38 @@ def test_fire_is_confirmed_retried_once_and_never_raises():
             raise OSError("connection refused")
 
     dead = NoRest()
-    asyncio.run(fire_confirmed(dead, 1, 3, log, confirm_s=0.1, poll_s=0.02))
-    assert dead.fires == 1   # nothing to confirm against: no retry, no crash
+    assert asyncio.run(fire_confirmed(dead, 1, 3, log, confirm_s=0.1, poll_s=0.02))
+    assert dead.fires == 1   # nothing to confirm against: counts as shown
 
     class AlwaysWrong(WrongUntilRefired):
         def connected_clip(self, layer):
             return 7
 
     wrong = AlwaysWrong()
-    asyncio.run(fire_confirmed(wrong, 1, 3, log, confirm_s=0.1, poll_s=0.02))
-    assert wrong.fires == 2  # one retry, then carry on
+    assert not asyncio.run(fire_confirmed(wrong, 1, 3, log, confirm_s=0.1, poll_s=0.02))
+    assert wrong.fires == 2  # one retry, then the caller keeps displayed put
+
+    class DeadSocket:
+        def __init__(self):
+            self.fires = 0
+        def fire_clip(self, layer, index):
+            self.fires += 1
+            return False   # the OSC send itself failed
+
+    sock = DeadSocket()
+    assert not asyncio.run(fire_confirmed(sock, 1, 3, log, confirm_s=0.1, poll_s=0.02))
+    assert sock.fires == 2   # one retry of the send, then give up, never raise
+
+
+def test_fire_clip_itself_never_raises():
+    from cockaigne_controller.resolume import Resolume
+    res = Resolume("127.0.0.1", 7000, rest_port=0)
+
+    def broken(*a, **k):
+        raise OSError("network is down")
+    res._osc.send_message = broken
+    assert res.fire_clip(1, 3) is False
+    assert res.set_volume(2, 0.5) is False
 
 
 def test_controller_refuses_a_holey_pool():

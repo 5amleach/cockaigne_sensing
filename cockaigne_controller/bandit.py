@@ -77,10 +77,14 @@ class ActionBias:
     """The lean from what individual people are doing.
 
     For each action the excess above its usual rate, max(0, rate - 1), is
-    remembered and decays with a half-life after it was last seen. Sitting
-    has no rate in Contract 2 (the crowd state carries only a count), so the
-    controller keeps its own baseline for the sitting fraction, the same way
-    the sensing side does for the other actions.
+    remembered and decays with a half-life on the controller's own clock,
+    so it fades even when messages stop. Rates are capped at rate_cap; every
+    rate is treated as 1.0 (no excess) until baseline_warmup_s of crowd
+    history has been seen, because a baseline built on seconds of data makes
+    the first sitter look like a stampede. The final lean per arm is capped
+    at lean_cap, half a Thompson draw, so it leans and can never select by
+    itself. Sitting has no rate in Contract 2, so a baseline for the sitting
+    fraction is kept here, the way sensing keeps the others.
     """
 
     def __init__(self, cfg: dict, band_size: dict):
@@ -88,18 +92,33 @@ class ActionBias:
         self.band_size = band_size
         self.level = {action: 0.0 for action in cfg["targets"]}
         self.sitting_baseline = 0.0
-        self._t_prev: float | None = None
+        self._at: float | None = None      # controller clock of the last observe
+        self._warm = 0.0                   # seconds of crowd history seen
+        self._t_prev: float | None = None  # message clock, for the baselines
 
-    def observe(self, crowd: dict) -> None:
+    def clear(self) -> None:
+        """Day start: yesterday's excesses do not lean on today."""
+        self.level = {action: 0.0 for action in self.level}
+
+    def _decayed(self, action: str, now: float) -> float:
+        if self._at is None:
+            return self.level[action]
+        return self.level[action] * 0.5 ** ((now - self._at) / self.cfg["half_life_s"])
+
+    def observe(self, crowd: dict, now: float) -> None:
         t = crowd["t"]
-        dt = 0.0 if self._t_prev is None else max(0.0, t - self._t_prev)
+        dt = 0.0 if self._t_prev is None else max(0.0, min(t - self._t_prev, 10.0))
         self._t_prev = t
-        decay = 0.5 ** (dt / self.cfg["half_life_s"])
+        self._warm += dt
         rates = dict(crowd.get("action_rates", {}))
         rates["sitting"] = self._sitting_rate(crowd, dt)
         for action in self.level:
-            excess = max(0.0, rates.get(action, 0.0) - 1.0)
-            self.level[action] = max(excess, self.level[action] * decay)
+            if self._warm < self.cfg["baseline_warmup_s"]:
+                excess = 0.0   # the baselines are too young to trust
+            else:
+                excess = max(0.0, min(rates.get(action, 0.0), self.cfg["rate_cap"]) - 1.0)
+            self.level[action] = max(excess, self._decayed(action, now))
+        self._at = now
 
     def _sitting_rate(self, crowd: dict, dt: float) -> float:
         n = crowd.get("n", 0)
@@ -108,11 +127,12 @@ class ActionBias:
         self.sitting_baseline += alpha * (fraction - self.sitting_baseline)
         return fraction / max(self.sitting_baseline, self.cfg["sitting_baseline_floor"])
 
-    def bias(self, band: str) -> dict[str, float]:
-        """The lean per arm name, scaled by one over the band's typical size."""
+    def bias(self, band: str, now: float) -> dict[str, float]:
+        """The lean per arm name, scaled by the band's typical size and
+        capped at lean_cap."""
         size = self.band_size[band]
         out: dict[str, float] = {}
         for action, arm in self.cfg["targets"].items():
-            lean = self.cfg["weights"][action] * self.level[action] / size
+            lean = self.cfg["weights"][action] * self._decayed(action, now) / size
             out[arm] = out.get(arm, 0.0) + lean
-        return out
+        return {arm: min(v, self.cfg["lean_cap"]) for arm, v in out.items()}

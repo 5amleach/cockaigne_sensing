@@ -7,15 +7,15 @@ Reads crowd state from the bus, fires one clip per cycle in Resolume,
 publishes each decision back through the bus and appends ledger entries.
 Fail-safes, all logged to the terminal and to controller.log_path:
 
-- Sensing quiet for blind_after_s: the clock keeps firing and the ring
-  steps down by one each cycle until Barren.
-- Bus connection down: retry every reconnect_s; decisions still fire,
-  unpublished ones are logged.
-- After each fire, the connected clip is confirmed over REST within
-  confirm_s; on a mismatch, one warning and one more fire, never a crash.
-  With --layout (no REST to ask), confirmation is off.
-- A clip pool with gaps stops the controller before the first fire, with
-  the gaps printed.
+- Resolume's REST not ready at start-up: retried every reconnect_s.
+- A clip pool with gaps stops the controller before the first fire.
+- Crowd state stale (its own clock stuck for blind_after_s): the ring steps
+  down from the displayed position each cycle until Barren.
+- Bus connection down: retried every reconnect_s while the clock keeps
+  firing; unpublished decisions are logged. A malformed or incomplete bus
+  message is logged and ignored; no message can kill the reader.
+- A fire that Resolume does not confirm is retried once, the decision is
+  published with confirmed false, and the displayed position stays put.
 """
 from __future__ import annotations
 
@@ -24,6 +24,7 @@ import asyncio
 import datetime
 import json
 import logging
+import math
 import time
 
 # Recorder and Ledger are the bus module's public face; the controller
@@ -36,6 +37,8 @@ from .clock import ClipClock
 from .config import load
 from .loop import Controller
 from .resolume import Resolume, layout_from_composition
+
+CROWD_FIELDS = ("t", "n", "n_smooth", "ring_target", "cohesion_smooth")
 
 
 def make_logger(path: str) -> logging.Logger:
@@ -61,14 +64,27 @@ def load_layout(path: str) -> dict[str, tuple[int, int]]:
     return {str(k).strip().lower(): (int(v[0]), int(v[1])) for k, v in data.items()}
 
 
+def valid_crowd(msg: dict) -> bool:
+    """A crowd message the controller may act on: the required fields are
+    present and are finite numbers."""
+    return all(isinstance(msg.get(k), (int, float)) and math.isfinite(msg[k])
+               for k in CROWD_FIELDS)
+
+
 async def fire_confirmed(resolume: Resolume, layer: int, index: int,
-                         log: logging.Logger, confirm_s: float, poll_s: float) -> None:
-    """Fire, then check over REST that the layer connected the intended
-    clip. On a mismatch: one warning, one more fire. Never raises — in the
-    gallery the show carries on and the log carries the news."""
-    resolume.fire_clip(layer, index)
+                         log: logging.Logger, confirm_s: float, poll_s: float) -> bool:
+    """Fire, then check over REST that the layer connected the intended clip.
+    Returns whether the clip can be taken as showing. Never raises: a failed
+    OSC send is retried once; an unreachable REST counts the fire as shown
+    (there is nothing to disagree with); a REST that disagrees after one
+    retry returns False and the caller keeps the displayed position put."""
+    if not resolume.fire_clip(layer, index):
+        log.warning(f"OSC send for layer {layer} clip {index} failed; retrying once")
+        if not resolume.fire_clip(layer, index):
+            log.warning("OSC send failed twice; clip not fired")
+            return False
     if confirm_s <= 0:
-        return
+        return True
     got = None
     for attempt in (1, 2):
         deadline = time.monotonic() + confirm_s
@@ -77,19 +93,24 @@ async def fire_confirmed(resolume: Resolume, layer: int, index: int,
             try:
                 got = await asyncio.to_thread(resolume.connected_clip, layer)
             except Exception as e:
-                log.warning(f"cannot confirm over REST ({e}); carrying on")
-                return
+                log.warning(f"cannot confirm over REST ({e}); counting the fire as shown")
+                return True
             if got == index:
-                return
+                return True
         if attempt == 1:
             log.warning(f"layer {layer} shows clip {got}, wanted {index}; firing again")
-            resolume.fire_clip(layer, index)
+            if not resolume.fire_clip(layer, index):
+                log.warning("OSC send failed on the retry; clip not fired")
+                return False
         else:
-            log.warning(f"layer {layer} still shows clip {got}, wanted {index}; carrying on")
+            log.warning(f"layer {layer} still shows clip {got}, wanted {index}")
+    return False
 
 
 class BusLink:
-    """Keeps one connection to the bus alive, reconnecting forever."""
+    """Keeps one connection to the bus alive, reconnecting forever. No bus
+    message, however malformed, can end the reader: bad ones are logged and
+    ignored, and any connection-level error leads back to the retry loop."""
 
     def __init__(self, url: str, controller: Controller, log: logging.Logger,
                  reconnect_s: float):
@@ -101,31 +122,52 @@ class BusLink:
 
     async def keep_connected(self) -> None:
         from websockets.asyncio.client import connect
-        from websockets.exceptions import ConnectionClosed
         while True:
             try:
                 async with connect(self.url) as ws:
                     self.ws = ws
                     self.log.info(f"bus connected at {self.url}")
                     async for raw in ws:
-                        msg = json.loads(raw)
-                        if msg.get("stream") == "crowd":
-                            self.controller.observe(msg, time.monotonic())
-            except (OSError, ConnectionClosed):
-                pass
+                        self._take(raw)
+            except asyncio.CancelledError:
+                raise
+            except Exception as e:
+                self.log.warning(f"bus reader error: {e!r}")
             self.ws = None
             self.log.warning(f"bus unreachable; retrying in {self.reconnect_s} s")
             await asyncio.sleep(self.reconnect_s)
 
+    def _take(self, raw) -> None:
+        try:
+            msg = json.loads(raw)
+        except (json.JSONDecodeError, TypeError, ValueError):
+            self.log.warning(f"unreadable message on the bus, ignored: {raw[:120]!r}")
+            return
+        if not isinstance(msg, dict) or msg.get("stream") != "crowd":
+            return
+        if not valid_crowd(msg):
+            self.log.warning(f"crowd message missing or bad fields, ignored: {str(msg)[:120]}")
+            return
+        self.controller.observe(msg, time.monotonic())
+
     async def send(self, message: dict) -> None:
-        from websockets.exceptions import ConnectionClosed
         if self.ws is None:
-            self.log.warning("bus away; decision fired but not published")
+            self.log.warning(f"bus away; decision {message['clip']} fired but not published")
             return
         try:
             await self.ws.send(json.dumps(message))
-        except ConnectionClosed:
-            self.log.warning("bus closed mid-send; decision not published")
+        except Exception:
+            self.log.warning(f"bus closed mid-send; decision {message['clip']} not published")
+
+
+async def read_layout_until_ready(resolume: Resolume, log: logging.Logger,
+                                  retry_s: float) -> dict:
+    while True:
+        try:
+            return resolume.read_layout()
+        except Exception as e:
+            log.warning(f"Resolume REST not ready ({e}); retrying in {retry_s} s")
+            await asyncio.sleep(retry_s)
 
 
 async def run(cfg: dict, layout_path: str | None = None, record: str | None = None) -> None:
@@ -137,9 +179,13 @@ async def run(cfg: dict, layout_path: str | None = None, record: str | None = No
         confirm_s = 0.0
         log.info("layout from file; fire confirmation off (no REST to ask)")
     else:
-        layout = resolume.read_layout()
+        layout = await read_layout_until_ready(resolume, log, cfg["controller"]["reconnect_s"])
         confirm_s = res_cfg["confirm_s"]
-    clipmap = ClipMap(list(layout), cfg["map"]["arms"], cfg["map"]["rings"])
+    # The map is built from the video layer only; stems and idents elsewhere
+    # in the composition cannot shadow a move clip.
+    names = [n for n, (layer, _) in layout.items() if layer == res_cfg["video_layer"]] \
+        if not layout_path else list(layout)
+    clipmap = ClipMap(names, cfg["map"]["arms"], cfg["map"]["rings"])
     missing = clipmap.missing()
     if missing:
         for m in missing:
@@ -162,37 +208,50 @@ async def run(cfg: dict, layout_path: str | None = None, record: str | None = No
             controller.ensure_day(datetime.date.today(), ledger)
             blind = controller.is_blind(now)
             if blind and not was_blind:
-                log.warning("no crowd state for "
-                            f"{cfg['controller']['blind_after_s']} s; running blind, "
-                            "stepping the ring down each cycle")
+                log.warning(f"crowd clock stale for {cfg['controller']['blind_after_s']} s; "
+                            "running blind, stepping the displayed ring down each cycle")
             if not blind and was_blind:
                 log.info("crowd state is back")
             was_blind = blind
             if clock.started is None or clock.clip_due(now):
+                if clock.started is not None:
+                    late = now - clock.started - clock.clip_s
+                    if late > 1.0:
+                        log.warning(f"firing {late:.1f} s late")
                 if pending is None:  # the very first clip has no audio lead
                     pending = controller.decide(now)
                 decision, (layer, index) = pending
                 pending = None
                 clock.start(now)
-                controller.fired(now)
-                await fire_confirmed(resolume, layer, index, log,
-                                     confirm_s, res_cfg["confirm_poll_s"])
+                controller.settle_reward()  # the previous clip ran its full length
+                ok = await fire_confirmed(resolume, layer, index, log,
+                                          confirm_s, res_cfg["confirm_poll_s"])
+                decision["confirmed"] = ok
+                if ok:
+                    controller.confirm_fired(decision, now)
+                else:
+                    log.warning(f"fire of {decision['clip']} unconfirmed; "
+                                f"the wall stays at {controller.displayed}")
                 await link.send(decision)
                 if controller.last_outcome:
                     ledger.append("outcome", **controller.last_outcome)
                     controller.last_outcome = None
-                ledger.append("decision", arm=decision["arm"],
-                              ring=decision["ring_target"], n=controller.n,
-                              clip=decision["clip"], reason=decision["reason"])
+                ledger.append("decision", arm=decision["arm"], ring=decision["ring_target"],
+                              n=controller.n, clip=decision["clip"],
+                              reason=decision["reason"], confirmed=ok)
                 if recorder:
                     recorder.write(decision)
                 log.info(f"fired {decision['clip']:>8}  {decision['from']} -> "
                          f"{decision['to']}  ring {decision['ring_target']}  "
-                         f"({decision['reason']}, {decision['context']})")
+                         f"({decision['reason']}, {decision['context']}"
+                         f"{'' if ok else ', UNCONFIRMED'})")
             elif clock.audio_due(now):
                 pending = controller.decide(now)
                 audio.set_stems(resolume, cfg, pending[0]["ring_target"])
                 clock.mark_audio()
+            for w in controller.warnings:
+                log.warning(w)
+            controller.warnings.clear()
             await asyncio.sleep(cfg["controller"]["tick_s"])
     finally:
         link_task.cancel()
