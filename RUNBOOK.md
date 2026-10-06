@@ -28,7 +28,24 @@ python -m cockaigne_controller.run --layout pool.json     (terminal 3)
 
 The live launcher can also rehearse from footage: give a camera entry `file:`
 with a recorded clip instead of `ip:` and it plays as a camera, looped.
-Terminal 1 then becomes `python -m cockaigne_sensing.run`.
+Terminal 1 then becomes `python -m cockaigne_sensing.run`. In any rehearsal,
+`python -m cockaigne_sensing.tools.watch_bus` in its own terminal prints the
+room's state once a second — headcount, ring, Coherence Index, reservoir,
+moods, camera health — which is how to see the system working before the
+data wall exists.
+
+## The studio shed, one real camera
+
+`config/studio.yaml` is the shed: a 3.5 x 7.0 m floor, the viewing spot on
+the centre line 3.5 m in, cam1 on its sub-stream facing into the room.
+
+```
+python -m cockaigne_sensing.tools.frame_grid rtsp://... --out grid.png   (read the far wall's floor line off the grid)
+python -m cockaigne_sensing.tools.bench_detect CLIP --out bench/shed     (a clip of someone walking about)
+python -m cockaigne_sensing.tools.calibrate_auto bench/shed/tracks.jsonl --camera cam1        --facing into_u --far-wall-centre U V --config config/studio.yaml
+python -m cockaigne_sensing.run --config config/studio.yaml              (the live chain)
+python -m cockaigne_sensing.tools.watch_bus                              (watch it work)
+```
 
 The fake Resolume prints every clip fire it receives. `--layout` is a saved clip list, used because there is no Resolume to ask; no `pool.json` is checked in, so generate one first (a JSON list of clip names covering the map — the tests' `full_pool()` in `tests/helpers.py` is the model).
 

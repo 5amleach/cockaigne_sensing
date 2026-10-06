@@ -1,0 +1,113 @@
+# Sam's studio shed: one camera at one end facing into the room, a 3.5 x 7.0 m
+# floor, for testing the sensing chain before the venue exists. Run it with
+#   python -m cockaigne_sensing.run --config config/studio.yaml
+# This is a copy of sensing.yaml with the studio's floor and viewing spot; the
+# venue file stays untouched.
+
+floor:
+  width_m: 3.5      # across the shed, x; the "data wall" end is where the camera is not
+  length_m: 7.0     # along the shed, y = 0 at the data-wall end
+
+cameras:
+  # One entry per camera. The password is not stored here: set the environment
+  # variable COCKAIGNE_RTSP_PASSWORD on the sensing machine.
+  - name: cam1
+    ip: 192.168.1.101
+    user: admin
+    stream: sub          # sub for detection; main only when a module asks for a close look
+    homography: config/homography_cam1.json   # produce it with tools.calibrate_auto --config config/studio.yaml
+    # cam1 sits at one end of the shed, facing into the room ("into_u" for calibrate_auto).
+    floor_polygon: []    # pixel corners of the visible floor in this camera's detection frame,
+                         # e.g. [[0, 700], [640, 700], [560, 360], [80, 360]]. Feet outside are
+                         # ignored, which is what stops figures in the wall imagery counting as people.
+  # - name: cam2
+  #   ip: 192.168.1.102
+  #   ...
+  # A recorded clip can stand in for a camera at a desk (looped unless loop: false):
+  # - name: cam2
+  #   file: bench/clips/cam2.mkv
+  #   homography: config/homography_cam2.json
+
+capture:
+  retry_s: 0.5    # how long to wait before reopening a dropped camera stream
+
+launcher:
+  detect_fps: 5         # detections per second per camera; frames in between are skipped
+  camera_stale_s: 5     # a camera whose last frame is older than this is reported lost
+  camera_retry_s: 10    # how often to retry a camera that failed to open
+  log_path: sensing.log # log lines go here as well as to the terminal
+
+detector:
+  model: yolo11s.pt    # pretrained Ultralytics weights, person class only
+  imgsz: 1280          # input size the detector sees; 1280 found the far seated person, 640 may not
+  conf: 0.25           # minimum confidence to keep a detection
+  tracker: bytetrack.yaml
+  device: auto         # auto picks the GPU when present, otherwise CPU
+  min_track_age_s: 1.0 # a track younger than this is not reported; removes one-frame flickers
+  forget_after_s: 5.0  # a camera track id unseen this long is forgotten
+
+floor_tracker:
+  merge_distance_m: 0.5   # two cameras' floor positions closer than this are the same person
+  same_camera_iou: 0.5    # within one camera, boxes overlapping more than this are one person
+  drop_after_s: 3.0       # a person unseen for this long is removed
+  velocity_window_s: 1.0  # velocity is averaged over this window
+  coast_s: 1.0            # a person missed this long is still reported at their predicted position
+  gate_m: 1.2             # a sighting further than this from a prediction is not that person
+  bucket_s: 0.1           # camera messages within this window count as one instant
+  margin_m: 0.3           # observed feet may fall this far outside the floor and still count
+  warn_every_s: 30        # a camera problem is said at most this often
+
+cohesion:
+  smooth_window_s: 10.0   # weighted average window for the raw score
+  still_speed_mps: 0.15   # slower than this counts as standing still
+  signals: [clustering, coordination]  # relational signals in use; coordination folds stillness and synchrony into one
+  clustering_zero_at_ratio: 2.0  # spacing at this multiple of random placement scores 0; random spacing scores 0.5
+  crowd_interval_s: 1.0   # how often the crowd state message is emitted
+  occupancy_window_s: 10.0   # headcount is smoothed over this before it is used for blending
+  blend_weight_by_n: [[1, 0.0], [2, 0.5], [3, 0.9], [4, 1.0]]  # weight on relational cohesion vs proxy, by smoothed headcount
+  score_ceiling_by_n: [[1, 0.72], [2, 0.72], [3, 0.9], [4, 1.0]]  # ceiling on the blended score by smoothed headcount; one or two people top out below ring 4
+  proxy_dwell_full_s: 120 # dwell counts as full after this long in the room
+  proxy_spot_x_m: 1.75    # viewing spot, metres across the shed (centre line of a 3.5 m floor)
+  proxy_spot_y_m: 3.5     # viewing spot, metres along the shed from the data-wall end
+  proxy_spot_full_m: 1.0  # within this distance of the viewing spot, position scores full
+  proxy_spot_zero_m: 4.0  # at this distance or further from the viewing spot, position scores zero
+  rise_rate_per_s: 0.02   # how fast the reservoir rises toward a higher score
+  fall_rate_per_s: 0.01   # how fast it falls toward a lower score
+  ring_up:   [0.2, 0.4, 0.6, 0.8]   # reservoir level needed to reach ring 1, 2, 3, 4
+  ring_down: [0.1, 0.3, 0.5, 0.74]  # level below which the ring drops to 0, 1, 2, 3; 0.74 sits above the one-or-two-person ceiling
+
+mood:
+  # Everything in this section is a starting guess, to be tuned on site against
+  # footage from the final camera height. Treat the labels as provisional until then.
+  label_dwell_s: 8.0      # a person's mood label holds at least this long before it can change
+  sitting_ratio: 0.75     # box width / height above this, while stopped, reads as sitting
+  sitting_still_s: 2.0    # how long a person must have been stopped before sitting is read
+  arousal_speed_full_mps: 1.2  # walking at this speed scores arousal 1.0; arousal is from speed alone for now
+  accel_window_s: 2.0     # movement roughness is averaged over this window
+  valence_ref_s: 20.0     # the standing-height reference decays over about this long
+  valence_slump_neutral: 0.15  # slump below this fraction of standing height reads neutral
+  valence_slump_scale: 0.3     # slump this far beyond neutral costs one whole unit of valence
+  valence_jerk_scale: 3.0      # movement roughness (metres per second squared) that costs one unit of valence
+  straightness_window_s: 30.0  # path straightness is judged over this window
+  straightness_sample_s: 1.0   # positions for straightness are sampled this often, so jitter does not read as walking
+  straightness_min_path_m: 1.0 # with less walking than this, straightness is not judged at all
+  bored_straightness: 0.4 # wandering below this straightness, while calm, reads as bored
+  bored_arousal_max: 0.4  # ...and only while arousal is below this
+  happy_valence: 0.1      # valence above this reads happy
+  sad_valence: -0.1       # valence below this reads sad, or annoyed when arousal is high
+  annoyed_arousal: 0.6    # negative valence with arousal at or above this reads annoyed
+
+actions:
+  model: qwen2.5vl:3b     # Ollama model tag; alternatives gemma3:4b, moondream
+  interval_s: 3.0         # how often each person is asked about
+  agree_readings: 2       # readings in a row that must agree before an action is reported
+  baseline_window_s: 600  # window for each action's running baseline rate
+  enabled: [phone, drink, eat]   # Sam confirmed 19 Sept 2026 that eat and drink are in scope
+  count_min: 0.5          # an action score at or above this counts the person as doing it
+  rate_window_s: 60       # the "current rate" in action_rates is averaged over this window
+  baseline_floor: 0.02    # the baseline rate is never below this, so a first action in a quiet room reads as a spike, not infinity
+
+bus:
+  host: 127.0.0.1
+  port: 8765
+  ledger_path: ledger.jsonl

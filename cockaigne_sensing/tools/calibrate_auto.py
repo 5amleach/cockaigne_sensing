@@ -107,9 +107,10 @@ def main() -> None:
     ap.add_argument("--hfov", type=float, default=87.0)
     ap.add_argument("--person-height", type=float, default=1.7)
     ap.add_argument("--out")
+    ap.add_argument("--config", help="settings file whose floor size to use, e.g. config/studio.yaml")
     args = ap.parse_args()
 
-    cfg = load()["floor"]
+    cfg = load(args.config)["floor"]
     W, L = cfg["width_m"], cfg["length_m"]
     first = next(replay(args.tracks, stream="tracks"))
     image_size = (first["w"], first["h"])

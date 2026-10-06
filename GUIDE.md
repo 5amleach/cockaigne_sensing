@@ -40,7 +40,7 @@ In: messages from the chain. Out: the same messages, to every listener, plus led
 
 ## tools
 
-Command-line helpers, none of which run in the gallery: `bench_detect` (run detection over a clip and report), `calibrate_auto` (approximate camera calibration from the people in a recording), `plan_view` (draw a recording as paths on the floor plan), `fake_room` (a scripted, made-up room for building without cameras), and, still to come, `calibrate` from measured floor markers.
+Command-line helpers, none of which run in the gallery: `bench_detect` (run detection over a clip and report), `frame_grid` (save one frame with a labelled pixel grid, for reading off the far wall's floor line by eye), `calibrate_auto` (approximate camera calibration from the people in a recording; `--config` picks the room, e.g. the studio), `plan_view` (draw a recording as paths on the floor plan), `fake_room` (a scripted, made-up room for building without cameras), `watch_bus` (one plain-text line a second — headcount, ring, Coherence Index, reservoir, moods, camera health — the view of the system before the data wall exists), and, still to come, `calibrate` from measured floor markers.
 
 ## controller
 
