@@ -24,6 +24,7 @@ All times are seconds as a float. Live, `t` is `time.monotonic()` on the sensing
 ```json
 {"t": 12.40,
  "floor": {"w": 12.0, "h": 9.0},
+ "cameras": {"cam1": {"alive": true, "age_s": 0.2}},
  "people": [
    {"id": 7, "x": 2.1, "y": 4.8, "vx": 0.3, "vy": -0.1, "age": 12.4,
     "box_ratio": 0.94, "box_h": 192,
@@ -34,6 +35,7 @@ All times are seconds as a float. Live, `t` is `time.monotonic()` on the sensing
 ```
 
 - `id` is stable across the whole room and all cameras, as best a plain tracker can: a crossing, a long occlusion or a calibration error can retire or swap an id.
+- `cameras` is health, written by the live launcher: whether each configured camera is alive and how old its last frame is in seconds. Replayed or fabricated people lists may omit it.
 - `x`, `y` in metres; `vx`, `vy` in metres per second, smoothed.
 - `age` is seconds since this person was first seen.
 - `box_ratio` is the rectangle's width divided by its height in the best camera view. `box_h` is that rectangle's height in pixels, used to judge slump against the person's own standing height.
@@ -83,7 +85,7 @@ Controller → bus → data wall. Owned by the controller package (`cockaigne_co
 {"t_wall": "2026-09-19T14:03:40+09:30", "kind": "outcome", "arm": "machinery", "delta_cohesion": 0.07}
 ```
 
-`kind` is one of `action`, `decision`, `outcome`, `ring_change`, `day_start`, `note`. Extra fields depend on kind.
+`kind` is one of `action`, `decision`, `outcome`, `ring_change`, `day_start`, `camera_lost`, `camera_back`, `note`. Extra fields depend on kind.
 
 ## Recording format
 

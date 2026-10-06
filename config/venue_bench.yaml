@@ -16,6 +16,13 @@ cameras:
   stream: main
   homography: config/homography_venueB.json
   floor_polygon: []
+capture:
+  retry_s: 0.5
+launcher:
+  detect_fps: 5
+  camera_stale_s: 5
+  camera_retry_s: 10
+  log_path: sensing.log
 detector:
   model: yolo11s.pt
   imgsz: 1280

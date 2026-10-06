@@ -106,6 +106,17 @@ class FloorStage:
         self._bucket.extend(self.sightings(msg))
         return result
 
+    def tick(self, t: float) -> dict | None:
+        """Time passing with no camera message still produces people messages,
+        so an empty room reports itself and coasting people age out. The
+        launcher calls this on a timer; file replays rely on push alone."""
+        if self._bucket_t is not None:
+            if t - self._bucket_t > self.bucket_s:
+                return self.flush()
+            return None
+        people = self.tracker.update(t, [])
+        return people_message(t, self.W, self.L, people)
+
     def flush(self) -> dict | None:
         if self._bucket_t is None:
             return None

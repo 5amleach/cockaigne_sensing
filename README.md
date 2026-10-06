@@ -46,4 +46,4 @@ That prints how many people were found each second, saves a few annotated frames
 
 ## Status
 
-5 Oct 2026. Capture, detect, floor, features, the fake room and the bus exist; the chain runs end to end on venue footage and on scripted rooms (see `bench/`). The controller (`cockaigne_controller`) exists through build step 5 — clip map, clock, bandit, action lean, daily personality, ledger — with audio stems stubbed, and has run against the fake day, the bus and the fake Resolume. Actions is described but not yet written, as it needs the render PC's GPU.
+6 Oct 2026. The live launcher exists: `python -m cockaigne_sensing.run` starts cameras, detection, floor, features and the bus in one process, with camera health in every people message and recorded clips able to stand in for cameras. The controller (`cockaigne_controller`) exists through build step 5 with audio stems stubbed. Remaining: actions (needs the render PC's GPU), the marker calibration tool, process supervision and the boot arrangement (see `AUDIT-RESPONSE.md`).

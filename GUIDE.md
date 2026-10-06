@@ -4,9 +4,9 @@ What each part of the system does, for a reader who is not a programmer. One sec
 
 ## capture
 
-Opens one picture source — a camera address or a video file — and hands out pictures, each stamped with the time it was taken. The launcher that opens all four gallery cameras and runs the live chain is not yet built; today each stage runs from recordings (see RUNBOOK.md). A file and a camera behave identically downstream, which is how the system is tested at a desk. Each camera offers two picture streams: a small cheap one that detection runs on, and a full-size one used only when a close look at one person is needed.
+Opens the picture sources. One command, `python -m cockaigne_sensing.run`, starts the whole live chain: every configured camera gets its own reading thread, detection runs on each camera's newest frame a few times a second, and floor, features and the bus share the main loop. A camera entry may name a video file instead of an address, so recorded clips stand in for cameras at a desk, looped. A camera that fails to open is retried every ten seconds; one that stops sending frames is reported lost — in the log, in the ledger, and in every people message's `cameras` health field — and reported back when it returns. Start-up refuses to run if any camera lacks its calibration file, naming it. Each camera offers two picture streams: a small cheap one that detection runs on, and a full-size one used only when a close look at one person is needed.
 
-In: camera streams or a video file. Out: timestamped frames, handed to `detect` and nowhere else — this is the only module that ever holds a picture of the room. Config that matters: the camera addresses and which stream each uses. If it stops: everything downstream starves, the controller goes blind (see the controller section) and the wall settles to Barren.
+In: camera streams or video files. Out: timestamped frames, handed to `detect` and nowhere else — this is the only module that ever holds a picture of the room. Config that matters: the camera entries, `launcher.detect_fps`, `launcher.camera_stale_s`. If the whole process stops: everything downstream starves, the controller goes blind (see the controller section) and the wall settles to Barren. If one camera stops: the rest carry on, and the loss is visible everywhere health is shown.
 
 ## detect
 

@@ -22,9 +22,19 @@ cameras:
   # - name: cam2
   #   ip: 192.168.1.102
   #   ...
+  # A recorded clip can stand in for a camera at a desk (looped unless loop: false):
+  # - name: cam2
+  #   file: bench/clips/cam2.mkv
+  #   homography: config/homography_cam2.json
 
 capture:
   retry_s: 0.5    # how long to wait before reopening a dropped camera stream
+
+launcher:
+  detect_fps: 5         # detections per second per camera; frames in between are skipped
+  camera_stale_s: 5     # a camera whose last frame is older than this is reported lost
+  camera_retry_s: 10    # how often to retry a camera that failed to open
+  log_path: sensing.log # log lines go here as well as to the terminal
 
 detector:
   model: yolo11s.pt    # pretrained Ultralytics weights, person class only

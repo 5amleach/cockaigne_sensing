@@ -8,7 +8,7 @@ Everything runs on one computer, the render PC, which also runs Resolume. The fo
 
 Three of our processes run in the gallery, each in its own terminal:
 
-1. **The sensing chain** — cameras in, people list and crowd state out, published on the bus. *The single live launcher for the whole chain is not written yet*; today each stage runs from a recording for development, and the live launcher is the next piece of plumbing. The bus half exists: `python -m cockaigne_sensing.bus.run <recording>` serves a recording exactly as the live chain will.
+1. **The sensing chain** — `python -m cockaigne_sensing.run`. One command: cameras in, people list and crowd state out, published on the bus it opens itself at `ws://127.0.0.1:8765`. The camera password is the environment variable `COCKAIGNE_RTSP_PASSWORD`. It refuses to start if a configured camera has no calibration file, naming the camera; a camera that is down at start is retried every ten seconds while the rest run. (`python -m cockaigne_sensing.bus.run <recording>` still serves recordings for desk work.)
 2. **The controller** — `python -m cockaigne_controller.run`. Reads the crowd state from the bus, fires one clip a minute in Resolume, publishes each decision.
 3. **Resolume** — started like any other day; it must be open with the Cockaigne composition loaded before the controller starts, because the controller reads the clip list from it and refuses to start if clips are missing (it prints which ones).
 
@@ -26,13 +26,17 @@ python -m cockaigne_controller.fake_resolume              (terminal 2)
 python -m cockaigne_controller.run --layout pool.json     (terminal 3)
 ```
 
+The live launcher can also rehearse from footage: give a camera entry `file:`
+with a recorded clip instead of `ip:` and it plays as a camera, looped.
+Terminal 1 then becomes `python -m cockaigne_sensing.run`.
+
 The fake Resolume prints every clip fire it receives. `--layout` is a saved clip list, used because there is no Resolume to ask; no `pool.json` is checked in, so generate one first (a JSON list of clip names covering the map — the tests' `full_pool()` in `tests/helpers.py` is the model).
 
 ## What failure looks like, and what to do
 
 **The wall sits on one clip and the data screen shows no new decisions.** The controller has died; what the wall shows meanwhile is Resolume's own behaviour (typically the current clip looping or holding). Restart the controller. It starts at Barren and climbs again; beliefs learned earlier that day are lost, which is acceptable.
 
-**The wall drains to Barren over a few minutes, one ring per minute, while people are clearly in the room.** The controller is running blind: the crowd state's own clock has not advanced for thirty seconds (nothing arriving, or the same stale message repeating), so it steps the displayed position's ring down each cycle until Barren rather than guessing. The sensing chain or the bus has died — look at those two terminals, restart whichever has stopped. The log line reads `running blind, stepping the ring down each cycle`, and `crowd state is back` when it recovers.
+**The wall drains to Barren over a few minutes, one ring per minute, while people are clearly in the room.** The controller is running blind: the crowd state's own clock has not advanced for thirty seconds, so it steps the displayed position's ring down each cycle until Barren rather than guessing. The sensing process has died — restart `python -m cockaigne_sensing.run`. If sensing is up but a camera is down, the wall keeps running on the remaining cameras and `sensing.log` and the data screen's camera health say which one to fix. The log line reads `running blind, stepping the ring down each cycle`, and `crowd state is back` when it recovers.
 
 **The wall plays sensibly but the data screen is stale.** The bus has died (the controller will also be logging `bus unreachable; retrying in 5 s` while carrying on). Restart the bus; the controller reconnects within five seconds by itself, and the data wall page may need a reload.
 
@@ -46,6 +50,7 @@ The fake Resolume prints every clip fire it receives. `--layout` is a saved clip
 
 - **The ledger**, `ledger.jsonl` next to where the bus was started: one line per event — day start and personality, ring changes, detected actions, every clip decision, every outcome. Append-only, never wiped; this is the record of what the machine did and why.
 - **The controller log**, `controller.log` (path in `config/controller.yaml`): everything the controller printed, including every fire, blind periods, bus reconnects and fire-confirmation warnings.
+- **The sensing log**, `sensing.log` (path in `config/sensing.yaml`): the launcher's record — cameras lost and back, calibration complaints, start-up refusals.
 - **The terminals** of the sensing chain and the bus show their own chatter; nothing sensing-side writes video or pictures to disk, ever, unless a developer passed `--record`, which the gallery configuration never does.
 
 ## The fail-safes, in one place
