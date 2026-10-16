@@ -21,6 +21,7 @@ import threading
 import time
 
 import cv2
+import numpy as np
 
 from .capture import FrameSource, reolink_url
 from .detect import tracks_message
@@ -72,6 +73,14 @@ class CameraWorker(threading.Thread):
 
     def run(self) -> None:
         while not self._stop.is_set():
+            if self.tracker is None:
+                # One detection on a blank frame before any stream is open.
+                # The model's cold start takes seconds, during which no frame
+                # would arrive, tripping the health window and writing a false
+                # camera_lost to the ledger.
+                self.tracker = self.tracker_factory()
+                self.tracker.update(np.zeros((360, 640, 3), np.uint8), time.monotonic())
+                self.started_at = time.monotonic()
             try:
                 source = FrameSource(self.uri, self.cam_name, retry_s=self.read_retry_s)
             except RuntimeError as e:
@@ -82,8 +91,6 @@ class CameraWorker(threading.Thread):
                 self.disabled = True
                 source.close()
                 return
-            if self.tracker is None:
-                self.tracker = self.tracker_factory()
             self._read(source)
             source.close()
             if self.is_file and not self.loop_file:
