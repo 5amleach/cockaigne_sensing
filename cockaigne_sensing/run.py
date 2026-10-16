@@ -129,7 +129,7 @@ class Launcher:
             while True:
                 now = time.monotonic()
                 for w in workers:
-                    ok = w.age(now) <= stale_s and not w.disabled
+                    ok = (w.warming or w.age(now) <= stale_s) and not w.disabled
                     if ok != alive[w.cam_name]:
                         alive[w.cam_name] = ok
                         if ok:

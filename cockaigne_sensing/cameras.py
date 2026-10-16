@@ -60,6 +60,7 @@ class CameraWorker(threading.Thread):
         self.tracker = None
         self.started_at = time.monotonic()
         self.last_frame_at: float | None = None
+        self.warming = True   # health does not count while the detector cold-starts
         self.disabled = False
         self._stop = threading.Event()
 
@@ -81,6 +82,7 @@ class CameraWorker(threading.Thread):
                 self.tracker = self.tracker_factory()
                 self.tracker.update(np.zeros((360, 640, 3), np.uint8), time.monotonic())
                 self.started_at = time.monotonic()
+                self.warming = False
             try:
                 source = FrameSource(self.uri, self.cam_name, retry_s=self.read_retry_s)
             except RuntimeError as e:
