@@ -3,7 +3,7 @@
 Usage:
     python -m cockaigne_sensing.tools.bench_detect CLIP [--out DIR] [--fps 5]
                                                    [--model yolo11s.pt] [--imgsz 1280]
-                                                   [--device auto] [--snap 10]
+                                                   [--device auto] [--snap 10] [--seconds N]
 
 Prints one line per second: how many people were found and their track ids.
 Saves an annotated frame every --snap seconds to DIR so a person can look.
@@ -36,6 +36,8 @@ def main() -> None:
     ap.add_argument("--imgsz", type=int, help="override config detector.imgsz")
     ap.add_argument("--device", help="override config detector.device (auto, cpu, 0)")
     ap.add_argument("--snap", type=int, default=10, help="save an annotated frame every N seconds")
+    ap.add_argument("--seconds", type=float,
+                    help="stop after this many seconds of wall clock, so a live stream still gets its summary")
     ap.add_argument("--camera", default="cam1")
     args = ap.parse_args()
 
@@ -58,6 +60,8 @@ def main() -> None:
     n_frames = 0
     t_start = time.time()
     for t, frame in src.frames():
+        if args.seconds is not None and time.time() - t_start >= args.seconds:
+            break
         tracks = tracker.update(frame, t)
         rec.write(tracks_message(t, args.camera, src.width, src.height, tracks))
         n_frames += 1
