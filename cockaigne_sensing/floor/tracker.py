@@ -26,7 +26,9 @@ class Sighting:
     conf: float
     camera: str = "cam"          # which camera saw it
     det_id: int = 0              # the detector's own track id on that camera
-    box: tuple | None = None     # the pixel rectangle, for duplicate detection
+    box: tuple | None = None     # the pixel rectangle, for duplicate detection and the view
+    w: int = 0                   # the frame size the rectangle is measured in,
+    h: int = 0                   # from the camera message
 
 
 def _iou(a: tuple | None, b: tuple | None) -> float:
@@ -51,6 +53,7 @@ class Person:
     last_seen: float = 0.0
     box_ratio: float = 0.5
     box_h: float = 0.0
+    view: dict | None = None     # where the latest sighting saw this person (Contract 1)
     history: list = field(default_factory=list)  # (t, x, y), recent only
 
 
@@ -93,7 +96,9 @@ class FloorTracker:
             pending = rest
             n = len(group)
             merged.append(Sighting(sum(g.x for g in group) / n, sum(g.y for g in group) / n,
-                                   lead.box_ratio, lead.box_h, max(g.conf for g in group)))
+                                   lead.box_ratio, lead.box_h, max(g.conf for g in group),
+                                   camera=lead.camera, det_id=lead.det_id, box=lead.box,
+                                   w=lead.w, h=lead.h))
         return merged
 
     def update(self, t: float, sightings: list[Sighting]) -> list[Person]:
@@ -126,7 +131,8 @@ class FloorTracker:
         for i, s in enumerate(sightings):
             if i not in used_s:
                 p = Person(self._next_id, s.x, s.y, first_seen=t, last_seen=t,
-                           box_ratio=s.box_ratio, box_h=s.box_h, history=[(t, s.x, s.y)])
+                           box_ratio=s.box_ratio, box_h=s.box_h, view=_view(s),
+                           history=[(t, s.x, s.y)])
                 self._next_id += 1
                 self.people[p.id] = p
         # A person missed this step is still reported at their predicted
@@ -153,11 +159,12 @@ class FloorTracker:
         if self.bounds:
             x = min(max(x, 0.0), self.bounds[0])
             y = min(max(y, 0.0), self.bounds[1])
-        return replace(p, x=x, y=y)
+        return replace(p, x=x, y=y, view=None)  # not seen this step, so no view
 
     def _observe(self, p: Person, t: float, s: Sighting) -> None:
         p.x, p.y = s.x, s.y
         p.box_ratio, p.box_h = s.box_ratio, s.box_h
+        p.view = _view(s)
         p.last_seen = t
         p.history.append((t, s.x, s.y))
         p.history = [h for h in p.history if t - h[0] <= self.velocity_window_s]
@@ -167,11 +174,22 @@ class FloorTracker:
             p.vx, p.vy = 0.5 * p.vx + 0.5 * vx, 0.5 * p.vy + 0.5 * vy  # light smoothing
 
 
+def _view(s: Sighting) -> dict | None:
+    """Where a sighting was seen, for Contract 1: camera, detector track,
+    pixel rectangle and the frame size it is measured in."""
+    if s.box is None:
+        return None
+    return {"camera": s.camera, "track": s.det_id,
+            "box": [int(round(v)) for v in s.box],
+            "w": s.w, "h": s.h, "conf": round(s.conf, 2)}
+
+
 def people_message(t: float, floor_w: float, floor_l: float, people: list[Person]) -> dict:
     """Shape the tracker's people into a Contract 1 message.
 
     Posture, actions, arousal and valence are placeholders here; features
-    and actions fill them in downstream.
+    and actions fill them in downstream, and features adds the mood label.
+    view is the latest sighting, or None for a person coasting unseen.
     """
     return {
         "stream": "people", "t": round(t, 3),
@@ -181,6 +199,7 @@ def people_message(t: float, floor_w: float, floor_l: float, people: list[Person
              "vx": round(p.vx, 2), "vy": round(p.vy, 2),
              "age": round(t - p.first_seen, 1),
              "box_ratio": round(p.box_ratio, 2), "box_h": round(p.box_h),
+             "view": p.view,
              "posture": "standing",
              "actions": {"phone": 0.0, "drink": 0.0, "eat": 0.0},
              "arousal": 0.5, "valence": 0.0}

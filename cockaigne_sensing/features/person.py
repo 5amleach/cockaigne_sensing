@@ -60,7 +60,7 @@ class PersonScorer:
             p["posture"] = self._posture(st, t, p)
             p["arousal"] = round(self._arousal(p), 2)
             p["valence"] = round(self._valence(st, p), 2)
-            labels[p["id"]] = self._mood(st, t, p)
+            labels[p["id"]] = p["mood"] = self._mood(st, t, p)
         for pid in [pid for pid, st in self.states.items()
                     if t - st.last_seen > self.forget_after_s]:
             del self.states[pid]

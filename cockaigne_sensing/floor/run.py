@@ -93,7 +93,8 @@ class FloorStage:
                 continue  # feet off the floor: wall imagery, or a lens-edge error
             x1, y1, x2, y2 = tr["box"]
             out.append(Sighting(x, y, (x2 - x1) / max(1.0, y2 - y1), y2 - y1, tr["conf"],
-                                camera=camera, det_id=tr["id"], box=tuple(tr["box"])))
+                                camera=camera, det_id=tr["id"], box=tuple(tr["box"]),
+                                w=msg["w"], h=msg["h"]))
         return out
 
     def push(self, msg: dict) -> dict | None:

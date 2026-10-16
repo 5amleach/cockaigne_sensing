@@ -28,7 +28,9 @@ All times are seconds as a float. Live, `t` is `time.monotonic()` on the sensing
  "people": [
    {"id": 7, "x": 2.1, "y": 4.8, "vx": 0.3, "vy": -0.1, "age": 12.4,
     "box_ratio": 0.94, "box_h": 192,
-    "posture": "sitting",
+    "view": {"camera": "cam1", "track": 7, "box": [412, 118, 470, 310],
+             "w": 640, "h": 360, "conf": 0.88},
+    "posture": "sitting", "mood": "happy",
     "actions": {"phone": 0.81, "drink": 0.0, "eat": 0.0},
     "arousal": 0.62, "valence": -0.15}
  ]}
@@ -39,7 +41,8 @@ All times are seconds as a float. Live, `t` is `time.monotonic()` on the sensing
 - `x`, `y` in metres; `vx`, `vy` in metres per second, smoothed.
 - `age` is seconds since this person was first seen.
 - `box_ratio` is the rectangle's width divided by its height in the best camera view. `box_h` is that rectangle's height in pixels, used to judge slump against the person's own standing height.
-- `posture`, `actions`, `arousal`, `valence` are filled in by `features` and `actions`. `floor` emits them as `"standing"`, all zeros, `0.5`, `0.0` and later stages overwrite. A reader must not assume they are meaningful until the message has passed through `features`.
+- `view` says where the latest sighting of this person was: which camera, the detector's own track id on that camera (Contract 0's `id`), the pixel rectangle, the frame size (`w` × `h`) those pixels are measured in, and the detection confidence. It is `null` when the person is coasting and was not seen this step. The data wall uses it to draw the person's box on the camera's frame.
+- `posture`, `actions`, `arousal`, `valence` are filled in by `features` and `actions`. `floor` emits them as `"standing"`, all zeros, `0.5`, `0.0` and later stages overwrite. `mood` (one of `happy`, `sad`, `bored`, `annoyed`) is added by `features`; `floor` does not emit it. A reader must not assume any of these are meaningful until the message has passed through `features`.
 
 ## Contract 2 — crowd state
 

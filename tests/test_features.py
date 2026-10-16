@@ -178,6 +178,13 @@ def test_posture_sitting_needs_width_and_a_stop():
     assert m["people"][0]["posture"] == "walking"
 
 
+def test_mood_is_written_into_each_person():
+    stage = FeatureStage(load())
+    m = msg(0.0, [person(1, *SPOT)])
+    people_msg, _ = stage.push(m)
+    assert people_msg["people"][0]["mood"] in ("happy", "sad", "bored", "annoyed")
+
+
 def test_mood_label_holds_for_the_dwell_time():
     cfg = load()
     scorer = PersonScorer(cfg)

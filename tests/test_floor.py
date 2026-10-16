@@ -8,7 +8,7 @@ from cockaigne_sensing.config import load
 from cockaigne_sensing.floor.camera import Camera, focal_from_hfov, homography_from_camera
 from cockaigne_sensing.floor.homography import pixel_to_floor
 from cockaigne_sensing.floor.run import FloorStage
-from cockaigne_sensing.floor.tracker import FloorTracker, Sighting
+from cockaigne_sensing.floor.tracker import FloorTracker, Sighting, people_message
 
 REPO = Path(__file__).resolve().parent.parent
 W, L = 6.1, 7.4
@@ -86,6 +86,19 @@ def test_coasted_person_moves_along_their_velocity():
     assert len(out) == 1
     assert abs(out[0].x - 3.0) < 0.05 and abs(out[0].y - 2.2) < 0.15
     assert out[0].first_seen == 0.0  # age keeps counting from the real first sighting
+
+
+def test_seen_person_carries_view_and_a_coasting_person_does_not():
+    tr = FloorTracker(coast_s=1.0)
+    seen = tr.update(0.0, [Sighting(2.0, 3.0, 0.4, 500, 0.88, camera="cam1", det_id=7,
+                                    box=(412, 118, 470, 310), w=640, h=360)])
+    msg = people_message(0.0, W, L, seen)
+    assert msg["people"][0]["view"] == {"camera": "cam1", "track": 7,
+                                       "box": [412, 118, 470, 310],
+                                       "w": 640, "h": 360, "conf": 0.88}
+    coasting = tr.update(0.5, [])   # missed this step: still reported, but unseen
+    msg = people_message(0.5, W, L, coasting)
+    assert len(msg["people"]) == 1 and msg["people"][0]["view"] is None
 
 
 def test_stage_drops_feet_that_map_off_the_floor(tmp_path):
