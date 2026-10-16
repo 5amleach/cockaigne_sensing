@@ -29,9 +29,12 @@ cockaigne_sensing/      the Python package, one folder per module
   bus/                  publishes messages, records them for replay, keeps the ledger
   tools/                command-line helpers: bench tests, calibration, fake room, replay
 config/                 every threshold and camera setting lives here, nowhere else
+datawall/               the data wall page (index.html)
 bench/                  results from tests on footage (numbers and notes, never video)
 tests/                  small tests that run without a GPU
 ```
+
+The data wall: open `datawall/index.html` in Chrome while the sensing chain runs, F11 for full screen; `?look=heat` for the thermal palette.
 
 ## Running a bench test on footage
 
