@@ -38,6 +38,8 @@ The post office. It publishes every message over one local WebSocket; each open 
 
 In: messages from the chain. Out: the same messages, to every listener, plus ledger lines. Config that matters: `bus.host` and `bus.port` (fixed), `ledger_path`. If it stops: the controller keeps firing clips on its own clock and reconnects every five seconds; the data wall goes stale until the bus is back.
 
+Beside the bus, the live launcher also runs a small frame server (`frames.py`): each camera's newest picture, held in memory only and served at `http://127.0.0.1:8766/frame/<camera>.jpg` to this machine alone, so the data wall can show what a camera sees; nothing is ever written to disk.
+
 ## tools
 
 Command-line helpers, none of which run in the gallery: `bench_detect` (run detection over a clip and report), `frame_grid` (save one frame with a labelled pixel grid, for reading off the far wall's floor line by eye), `calibrate_auto` (approximate camera calibration from the people in a recording; `--config` picks the room, e.g. the studio), `plan_view` (draw a recording as paths on the floor plan), `fake_room` (a scripted, made-up room for building without cameras), `watch_bus` (one plain-text line a second — headcount, ring, Coherence Index, reservoir, moods, camera health — the view of the system before the data wall exists), and, still to come, `calibrate` from measured floor markers.

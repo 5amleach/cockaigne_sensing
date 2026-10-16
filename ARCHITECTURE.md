@@ -54,7 +54,7 @@ There is no cheap shortcut for phones. A lit screen was expected to show as a br
 
 ### bus
 
-Publishes the people list and the crowd state over a WebSocket on the local machine. The controller and the data wall each open a connection and receive every message. Also holds the recorder (writes every message to a `.jsonl` file, development only), the replayer (reads a `.jsonl` file back at the original speed), and the ledger (an append-only record of events that the data wall reads and that is never wiped).
+Publishes the people list and the crowd state over a WebSocket on the local machine. The controller and the data wall each open a connection and receive every message. Also holds the recorder (writes every message to a `.jsonl` file, development only), the replayer (reads a `.jsonl` file back at the original speed), and the ledger (an append-only record of events that the data wall reads and that is never wiped). The live launcher additionally serves each camera's newest JPEG from memory over HTTP on 127.0.0.1 only (`frames.py`, port 8766), so the data wall can draw the camera view; no frame is ever written to disk.
 
 ### tools
 

@@ -37,6 +37,7 @@ from .config import load
 from .features import FeatureStage
 from .floor.homography import load_homography
 from .floor.run import FloorStage
+from .frames import FrameServer, FrameStore
 
 
 def make_logger(path: str) -> logging.Logger:
@@ -94,10 +95,20 @@ class Launcher:
             recorders = {s: Recorder(out / f"{s}.jsonl")
                          for s in ("tracks", "people", "crowd")}
 
+        frames_cfg = cfg["launcher"].get("frames", {})
+        frame_server = None
+        store = None
+        if frames_cfg.get("enabled"):
+            store = FrameStore([cam["name"] for cam in cfg["cameras"]])
+            frame_server = FrameServer(store, frames_cfg["port"])
+            frame_server.start()
+            log.info(f"frames on http://127.0.0.1:{frame_server.port}, memory only")
+
         tracks_queue: queue.Queue = queue.Queue()
         workers = [CameraWorker(cam, cfg, tracks_queue, log,
                                 tracker_factory=self.tracker_factory,
-                                calibration_size=sizes.get(cam["name"]))
+                                calibration_size=sizes.get(cam["name"]),
+                                frame_store=store)
                    for cam in cfg["cameras"]]
         for w in workers:
             w.start()
@@ -156,6 +167,8 @@ class Launcher:
                         await put(crowd)
                 await asyncio.sleep(floor.bucket_s / 2)
         finally:
+            if frame_server:
+                frame_server.stop()
             for w in workers:
                 w.stop()
             for rec in recorders.values():

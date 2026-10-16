@@ -1,4 +1,4 @@
-# Bench configuration for the two 7 September venue clips. Same numbers as sensing.yaml,
+﻿# Bench configuration for the two 7 September venue clips. Same numbers as sensing.yaml,
 # with the two bench cameras in place of the gallery cameras. Used by tests and bench notes.
 floor:
   width_m: 6.1
@@ -23,6 +23,10 @@ launcher:
   camera_stale_s: 5
   camera_retry_s: 10
   log_path: sensing.log
+  frames:               # the latest frame per camera, for the data wall's camera panel;
+    enabled: true       # frames are held in memory, served only to this machine,
+    port: 8766          # never written to disk
+    jpeg_quality: 70
 detector:
   model: yolo11s.pt
   imgsz: 1280

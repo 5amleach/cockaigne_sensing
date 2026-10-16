@@ -1,4 +1,4 @@
-# Every adjustable number in the sensing system lives in this file.
+﻿# Every adjustable number in the sensing system lives in this file.
 # Code reads it at start-up. Nothing in the code carries its own copy of these values.
 
 floor:
@@ -35,6 +35,10 @@ launcher:
   camera_stale_s: 5     # a camera whose last frame is older than this is reported lost
   camera_retry_s: 10    # how often to retry a camera that failed to open
   log_path: sensing.log # log lines go here as well as to the terminal
+  frames:               # the latest frame per camera, for the data wall's camera panel;
+    enabled: true       # frames are held in memory, served only to this machine,
+    port: 8766          # never written to disk
+    jpeg_quality: 70
 
 detector:
   model: yolo11s.pt    # pretrained Ultralytics weights, person class only

@@ -20,6 +20,8 @@ import os
 import threading
 import time
 
+import cv2
+
 from .capture import FrameSource, reolink_url
 from .detect import tracks_message
 
@@ -39,7 +41,7 @@ class CameraWorker(threading.Thread):
     """Reads one camera forever; the launcher watches last_frame_at."""
 
     def __init__(self, cam: dict, cfg: dict, out_queue, log,
-                 tracker_factory=None, calibration_size=None):
+                 tracker_factory=None, calibration_size=None, frame_store=None):
         super().__init__(name=f"camera-{cam['name']}", daemon=True)
         self.cam_name = cam["name"]
         self.uri, self.is_file = camera_uri(cam)
@@ -50,6 +52,8 @@ class CameraWorker(threading.Thread):
         self.calibration_size = calibration_size
         self.queue = out_queue
         self.log = log
+        self.frame_store = frame_store
+        self.jpeg_quality = cfg["launcher"].get("frames", {}).get("jpeg_quality", 70)
         det = cfg["detector"]
         self.tracker_factory = tracker_factory or (lambda: _real_tracker(det))
         self.tracker = None
@@ -113,6 +117,11 @@ class CameraWorker(threading.Thread):
                 self.queue.put(tracks_message(now, self.cam_name,
                                               source.width, source.height, tracks))
                 last_detect = now
+                if self.frame_store is not None:
+                    ok, jpeg = cv2.imencode(".jpg", frame,
+                                            [cv2.IMWRITE_JPEG_QUALITY, self.jpeg_quality])
+                    if ok:
+                        self.frame_store.put(self.cam_name, jpeg.tobytes())
             if frame_dt:   # pace a file to its own rate, like a real camera
                 next_frame += frame_dt
                 delay = next_frame - time.monotonic()

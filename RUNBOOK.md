@@ -12,7 +12,7 @@ Three of our processes run in the gallery, each in its own terminal:
 2. **The controller** — `python -m cockaigne_controller.run`. Reads the crowd state from the bus, fires one clip a minute in Resolume, publishes each decision.
 3. **Resolume** — started like any other day; it must be open with the Cockaigne composition loaded before the controller starts, because the controller reads the clip list from it and refuses to start if clips are missing (it prints which ones).
 
-The data wall is an HTML page; it opens one connection to `ws://127.0.0.1:8765` and shows whatever arrives.
+The data wall is an HTML page; it opens one connection to `ws://127.0.0.1:8765` and shows whatever arrives. Its camera panel reads each camera's latest frame from `http://127.0.0.1:8766` — served from memory, to this machine only, never written to disk.
 
 Stopping anything: Ctrl-C in its terminal. Starting order barely matters — the controller retries Resolume's clip list at start-up and the bus every five seconds — but the comfortable order is Resolume, then sensing, then the controller.
 
