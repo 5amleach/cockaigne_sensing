@@ -6,7 +6,7 @@ from cockaigne_controller.clipmap import BARREN, ClipMap, node_ring, parse_clip_
 from cockaigne_controller.clock import ClipClock
 from cockaigne_controller.loop import Controller
 from cockaigne_controller.resolume import layout_from_composition
-from tests.helpers import ARMS, climb_to, crowd, full_pool, make_controller, step
+from tests.helpers import ARMS, climb_to, crowd, full_pool, make_controller, pool_288, step
 
 
 def test_clip_names_parse_by_the_rule():
@@ -28,7 +28,7 @@ def test_clip_names_parse_by_the_rule():
 def test_map_reports_what_is_missing():
     pool = [n for n in full_pool() if n not in ("m4m4", "f2b")]
     problems = ClipMap(pool, ARMS).missing()
-    assert any("loop clip for m4" in p for p in problems)
+    assert not any("loop" in p for p in problems)   # loops are optional
     assert any("f2 to b" in p for p in problems)
     # A node nothing leads into shows up as unroutable.
     pool = [n for n in full_pool()
@@ -110,12 +110,19 @@ def test_staying_put_loops_probes_or_moves_sideways():
     c.observe(crowd(t + 59.0, 3))
     d = step(c, t + 60.0)
     assert (d["to"], d["reason"]) == ("m3", "ring")   # the fixed arm pulls it home
-    # Ring 4 has a loop and uses it.
+    # Ring 4 with a loop clip uses it.
     c = make_controller()
     _, t = climb_to(c, 4)
     c.observe(crowd(t - 1.0, 4))
     d = step(c, t)
     assert (d["from"], d["to"], d["reason"]) == ("m4", "m4", "loop")
+    # Ring 4 without a loop clip holds sideways like any other ring.
+    c = make_controller(pool=[n for n in full_pool() if n != "m4m4"])
+    _, t = climb_to(c, 4)
+    c.observe(crowd(t - 1.0, 4))
+    d = step(c, t)
+    assert d["reason"] == "lateral"
+    assert d["from"] == "m4" and node_ring(d["to"]) == 4 and d["to"] != "m4"
 
 
 def test_blind_controller_steps_down_to_barren():
@@ -283,5 +290,14 @@ def test_fire_clip_itself_never_raises():
 
 def test_controller_refuses_a_holey_pool():
     from cockaigne_controller.clipmap import ClipMap
-    pool = [n for n in full_pool() if n != "m4m4"]
+    pool = [n for n in full_pool() if n != "b_m1"]
     assert ClipMap(pool, ARMS).missing() != []
+
+
+def test_the_real_pool_of_288_names_passes_missing():
+    pool = pool_288()
+    assert len(pool) == 288
+    cmap = ClipMap(pool, ARMS)
+    assert cmap.missing() == []
+    assert cmap.loops == {}         # the real pool has no loop clips
+    assert len(cmap.moves) == 288   # every name parsed, none collided

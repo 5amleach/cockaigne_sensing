@@ -128,17 +128,17 @@ class ClipMap:
         """What a complete pool must have but this one does not, in plain
         words. The controller checks this once at start-up and refuses to
         run while the list is not empty, so every move it can ever ask for
-        is known to exist: Barren out to every Ring 1 node, a loop for every
-        top-ring node, a ring-preserving route between every pair of arms on
-        every ring (holding a ring never leaves it), the direct collapses
-        from the middle rings, and a route between every pair of nodes.
+        is known to exist: Barren out to every Ring 1 node, a ring-preserving
+        route between every pair of arms on every ring (holding a ring never
+        leaves it), the direct collapses from the middle rings, and a route
+        between every pair of nodes. Loop clips are never required: holding
+        a ring is a sideways move, and Barren without a loop probes out to
+        Ring 1 and returns. A loop clip is simply used where one exists.
         """
         problems = []
         for a in self.arms:
             if (BARREN, node_name(a, 1)) not in self.moves:
                 problems.append(f"no clip from {BARREN} to {node_name(a, 1)} (Barren probe)")
-            if node_name(a, self.rings) not in self.loops:
-                problems.append(f"no loop clip for {node_name(a, self.rings)}")
             for r in range(2, self.rings):
                 if (node_name(a, r), BARREN) not in self.moves:
                     problems.append(f"no collapse clip {node_name(a, r)} to {BARREN}")
