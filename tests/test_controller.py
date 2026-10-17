@@ -17,6 +17,12 @@ def test_clip_names_parse_by_the_rule():
     assert parse_clip_name("s3b", ARMS, 4) == ("s3", "b")     # a collapse
     assert parse_clip_name("ident_logo", ARMS, 4) is None     # not a move clip
     assert parse_clip_name("a5a1", ARMS, 4) is None           # no ring 5
+    # The pool on disk codes Barren as b1.
+    assert parse_clip_name("b1a1", ARMS, 4) == ("b", "a1")
+    assert parse_clip_name("a3b1", ARMS, 4) == ("a3", "b")
+    assert parse_clip_name("b1b1", ARMS, 4) == ("b", "b")     # still a loop
+    assert parse_clip_name("b1a1_25fps", ARMS, 4) is None     # a variant, not a move
+    assert parse_clip_name("a1m1 (old)", ARMS, 4) is None     # a duplicate set aside
 
 
 def test_map_reports_what_is_missing():

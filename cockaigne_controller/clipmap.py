@@ -2,7 +2,8 @@
 
 A node is where the wall "is": Barren (`b`), or an arm at a ring (`m1` is
 Machinery ring 1). A clip's name carries its move, from-node then to-node,
-with an optional underscore: `a1m1`, `b_m1` and `bm1` all parse. A name
+with an optional underscore: `a1m1`, `b_m1` and `bm1` all parse. The clip
+pool on disk codes Barren as `b1`, so `b1m1` and `a3b1` parse too. A name
 whose two nodes are the same (`m4m4`, `b_b`) is that node's loop clip.
 Names that do not parse are ignored, so the composition can hold stems and
 idents without confusing the map.
@@ -29,7 +30,13 @@ def node_ring(node: str) -> int:
 def _take_node(s: str, arms: dict, rings: int) -> tuple[str, str] | None:
     """Read one node from the front of s. Returns (node, rest) or None."""
     if s.startswith(BARREN):
-        return BARREN, s[1:]
+        rest = s[1:]
+        # The pool codes Barren as b1; no arm is lettered b and no node
+        # starts with a digit, so a 1 straight after the b can only be
+        # Barren's own, never the start of the next node.
+        if rest.startswith("1"):
+            rest = rest[1:]
+        return BARREN, rest
     if len(s) >= 2 and s[0] in arms and s[1].isdigit() and 1 <= int(s[1]) <= rings:
         return s[:2], s[2:]
     return None
