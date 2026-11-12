@@ -1,6 +1,6 @@
 # Actions design
 
-Written 12 November 2026 by Claude (Fable), for Sam to accept or change before anything is built. The actions module answers one question per person, a few times a minute: is this person on a phone, drinking, eating, or none of these. It is the only unbuilt module in the sensing chain. Everything after it already exists: `features` counts the scores and computes `action_rates`, the bus writes `action` ledger lines, and the controller leans on the rates. So this module has exactly one output, the per-person `actions` scores in the people list (Contract 1), and that message does not change.
+Written 12 November 2026 by Claude (Fable), for Sam to accept or change before anything is built. The actions module answers one question per person, every few seconds: is this person on a phone, drinking, eating, or none of these. It is the only unbuilt module in the sensing chain. Everything after it already exists: `features` counts the scores and computes `action_rates`, the bus writes `action` ledger lines, and the controller leans on the rates. So this module has exactly one output, the per-person `actions` scores in the people list (Contract 1), and that message does not change.
 
 This document replaces the brief in `actions/__init__.py` where the two disagree. The disagreements are listed at the end as decisions for Sam.
 
