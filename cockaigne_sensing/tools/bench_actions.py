@@ -2,12 +2,16 @@
 
 Usage:
     python -m cockaigne_sensing.tools.bench_actions bench/sessions/shed1
-                --models qwen3-vl:4b-instruct,gemma4:e2b,gemma3:4b
+                --models objects,qwen3-vl:4b-instruct,gemma4:e2b,gemma3:4b
                 [--config config/studio.yaml] [--out bench/2026-11-20-actions.md]
 
 Reads the stills and the right answers that a scripted session saved
 (tools.script_session). Finds the person in each still, cuts the crop
 exactly as the live chain would, and puts the same question to each model.
+The name "objects" is not a language model. It is the person detector's
+own object classes run on the crop: a phone, a cup or a piece of food seen in
+it becomes the answer. It is far cheaper than a language model, and it is
+scored the same way, so the two can be compared directly.
 Reports, per model: how often it was right, for each action, each way of
 facing and each mark; what it mistook for what; and how long an answer
 took. The time decides how many questions a second the gallery can afford.
@@ -26,6 +30,45 @@ import cv2
 from ..actions import OllamaModel
 from ..capture import cut
 from ..config import load
+
+# The detector was trained on the COCO set of 80 everyday things. These are
+# the ones that mean an action. Anything else it sees counts as nothing.
+OBJECT_ACTIONS = {"cell phone": "phone",
+                  "cup": "drink", "bottle": "drink", "wine glass": "drink",
+                  **{food: "eat" for food in ("banana", "apple", "sandwich", "orange",
+                                               "hot dog", "pizza", "donut", "cake")}}
+
+
+def answer_from_objects(found: list[tuple[str, float]], enabled: list[str]) -> str:
+    """The action whose object the detector is surest it sees, or "none".
+    found is (class name, confidence) for everything seen in one crop."""
+    hits = [(conf, OBJECT_ACTIONS[name]) for name, conf in found
+            if OBJECT_ACTIONS.get(name) in enabled]
+    return max(hits)[1] if hits else "none"
+
+
+class ObjectCheck:
+    """Answers like a model, from what find(crop) says is in the picture."""
+
+    def __init__(self, find, enabled: list[str]):
+        self.find, self.enabled = find, list(enabled)
+
+    def ask(self, crop) -> str:
+        return answer_from_objects(self.find(crop), self.enabled)
+
+
+def yolo_objects(weights: str, conf: float, device: str):
+    """find(crop) for ObjectCheck: everything the detector sees in a crop."""
+    from ultralytics import YOLO   # here, so the report code runs without the detector
+    yolo = YOLO(weights)
+
+    def find(crop):
+        boxes = yolo.predict(crop, conf=conf, device=None if device == "auto" else device,
+                             verbose=False)[0].boxes
+        if boxes is None:
+            return []
+        return [(yolo.names[int(k)], float(c)) for k, c in zip(boxes.cls.tolist(), boxes.conf.tolist())]
+    return find
 
 
 def load_rows(session: Path) -> list[dict]:
@@ -96,7 +139,8 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("session", help="the folder tools.script_session wrote")
-    ap.add_argument("--models", required=True, help="Ollama model tags, comma separated")
+    ap.add_argument("--models", required=True,
+                    help="Ollama model tags, comma separated; 'objects' for the detector's object check")
     ap.add_argument("--config")
     ap.add_argument("--out", help="also write the report to this file")
     args = ap.parse_args()
@@ -112,7 +156,10 @@ def main() -> None:
              f"{len(rows)} stills, a person found in {len(crops)}. Crops padded by "
              f"{acts['crop_pad']} and shrunk to {acts['crop_max_px']} px, as live.", ""]
     for name in (m.strip() for m in args.models.split(",") if m.strip()):
-        model = OllamaModel(dict(acts, model=name))
+        if name == "objects":
+            model = ObjectCheck(yolo_objects(det["model"], det["conf"], det["device"]), acts["enabled"])
+        else:
+            model = OllamaModel(dict(acts, model=name))
         # The first question loads the model into the graphics card. It is not timed.
         if crops and model.ask(crops[0][1]) is None:
             lines.append(f"## {name}\nno answer to the first question. Is Ollama running, "

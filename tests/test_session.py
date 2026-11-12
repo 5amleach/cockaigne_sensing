@@ -7,7 +7,8 @@ import numpy as np
 import yaml
 
 from cockaigne_sensing.actions import FakeModel
-from cockaigne_sensing.tools.bench_actions import ask_all, load_rows, make_crops, report
+from cockaigne_sensing.tools.bench_actions import (ObjectCheck, answer_from_objects, ask_all,
+                                                   load_rows, make_crops, report)
 from cockaigne_sensing.tools.script_session import DEFAULT_SCRIPT, build_steps, draw, run_session
 
 
@@ -98,3 +99,14 @@ def test_bench_scores_each_model_against_the_script(tmp_path):
     assert "none called phone 4" in text
     silent = report("silent", ask_all(FakeModel([None]), crops))
     assert "right 0 of 8" in silent and "no answer 8" in silent
+
+
+def test_the_object_check_names_the_action_whose_object_is_surest():
+    enabled = ["phone", "drink", "eat"]
+    assert answer_from_objects([], enabled) == "none"
+    assert answer_from_objects([("person", 0.9), ("chair", 0.8)], enabled) == "none"
+    assert answer_from_objects([("cup", 0.4), ("cell phone", 0.7)], enabled) == "phone"
+    assert answer_from_objects([("donut", 0.6), ("cell phone", 0.3)], enabled) == "eat"
+    assert answer_from_objects([("cell phone", 0.9)], ["drink"]) == "none"   # phone not enabled
+    check = ObjectCheck(lambda crop: [("bottle", 0.5)], enabled)
+    assert check.ask(np.zeros((8, 8, 3), np.uint8)) == "drink"
