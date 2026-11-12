@@ -49,4 +49,6 @@ That prints how many people were found each second, saves a few annotated frames
 
 ## Status
 
+Open work is listed in `HANDOVER.md`. Read it after the four files above.
+
 12 Nov 2026. The live launcher exists: `python -m cockaigne_sensing.run` starts cameras, detection, floor, features and the bus in one process, with camera health in every people message and recorded clips able to stand in for cameras. The controller (`cockaigne_controller`) exists through build step 5 with audio stems stubbed. The actions module is built but switched off (`actions.live: false`): its model has not been chosen, and the scripted session and bench that choose it need the shed camera and the render PC's GPU (see `RUNBOOK.md`). Until then the data wall shows "?" for Tech adoption. Remaining: the actions model bench, the marker calibration tool, process supervision and the boot arrangement (see `AUDIT-RESPONSE.md`).
