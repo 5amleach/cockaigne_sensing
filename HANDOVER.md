@@ -12,9 +12,10 @@ Written by Claude (Fable) at the end of a working session with Sam, so that any 
 
 ## Open, in order
 
-1. **The scripted session (Sam, in the shed, lights off so the camera is in infrared).**
-   `python -m cockaigne_sensing.tools.script_session --out bench/sessions/shed1 --config config/studio.yaml --speak`
-   The full-screen window has not been run on a real display yet. If it fails, add `--no-window`. If the Reolink app can record the live view, record the performance too, so that models needing video clips can be tested later.
+1. **The scripted session is done (Sam, 12 November, about 5 pm, camera in infrared).** The full-screen window worked. It saved 275 stills, 5 for each of the 55 steps, with none missed. Each still took 0.75 seconds at the median and 0.89 at most. They are in `bench/sessions/shed1` with `session.jsonl` on the render PC only. Git ignores that folder, and it holds pictures of Sam, so it stays on this PC. A contact sheet checked by eye shows the labels match the poses at every mark, facing and posture. Two things for whoever scores the bench:
+   - In "drink" and "eat" holds, about one still in three shows the hand lowered between sips or bites, with the cup or food held at chest height. The script's label still says drink or eat, so a model answering "none" on those stills is not plainly wrong. Consider scoring per hold (the majority of its 5 stills) as well as per still.
+   - The "sitting" steps were done sitting on the rug, not on a chair.
+   The performance was not recorded as video.
 2. **Add a YOLO object check to `tools.bench_actions` before running it.** The detector already knows "cell phone", "cup" and "bottle". Run on the close-up crop it may spot what is in the hand, far more cheaply than a language model. It should be scored against the same stills as the language models.
 3. **Run the bench (render PC, needs Ollama and the models pulled).** The command is in `RUNBOOK.md`. Pick a model, set `actions.model`, `crop_max_px`, `max_asks_per_s`, and `live: true`. Stills take about 0.73 seconds, which is over the half second `actions/DESIGN.md` allows before considering the main-stream fallback. Judge the fallback from the still and the model's answer together.
 4. **Local `main` on the render PC is four commits ahead of GitHub.** `actions-design` was built from the GitHub copy and lacks them. Show Sam the commits (`git log origin/main..main --oneline`), push `main` if he agrees, then merge it into `actions-design`.
