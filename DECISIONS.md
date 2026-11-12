@@ -117,3 +117,14 @@ Format: date, who decided, the decision, the reason in one or two sentences.
 **2026-11-12 — Sam; built by Claude (Fable).** The cameras' password may live in `camera_password.txt` in the repo folder, read when the environment variable `COCKAIGNE_RTSP_PASSWORD` is not set. Reason: the variable-only rule lost the password and stalled a shed session; Sam called it a security measure creating an unnecessary problem, and he is right for a camera on a closed cable network. The rule that matters is kept: the file is in `.gitignore`, so the password cannot reach the public repository, and it is still never printed or logged.
 
 **2026-11-12 — Claude (Fable).** Correction to the entry above, made the same hour: `camera_password.txt` wins over the environment variable, not the other way round. Reason: a stale or mistyped variable would otherwise silently override the file a person has just corrected. Also fixed: log lines hid a password only up to its first `@`, so a password containing one showed its tail; the whole password is now hidden.
+
+**2026-11-12 — Sam, with Claude Code.** The shed camera cam1 now serves full-size stills over HTTP: `capture.fetch_still` returns a 3840 × 2160 picture. Ten stills took 0.66 to 0.81 seconds each, with a median of 0.73. That is above the "about half a second" line in `actions/DESIGN.md`, where the main-stream fallback is to be considered. The decision waits for the model bench, because the delay that matters is the still and the model's answer together. One question per still caps the rate at about 1.4 a second, below `max_asks_per_s: 3`. The camera's password had been lost, so it was factory reset and given a new one. On the render PC the new password is in `COCKAIGNE_RTSP_PASSWORD`, and there is no `camera_password.txt` to override it. It came back on the same address, 192.168.1.101. These settings were restored or set in the camera:
+- HTTP on port 80, RTSP on 554 and ONVIF on 8000 are on; HTTPS is off.
+- The name is cockaigne1.
+- The streams are unchanged: main 3840 × 2160 at 25 fps in H.265, and sub 640 × 360 at 10 fps in H.264.
+
+This closes the two camera items from 16 October:
+- The on-screen name, date and time, and Reolink watermark are switched off, and a still was checked by eye.
+- The camera clock was set from the render PC, Sydney time with daylight saving (first Sunday in October to first Sunday in April), not by NTP, because the camera has no internet.
+
+A reset puts the camera back on US Pacific time. When the zone is changed, the camera reads the time it is given in the old zone, so the time must be sent a second time after the zone change. All of this has to be redone if the camera is ever reset again.
