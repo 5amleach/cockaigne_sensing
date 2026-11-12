@@ -12,24 +12,24 @@ has no such address, so the newest frame of the file stands in.
 """
 from __future__ import annotations
 
-import os
-
 import cv2
 import numpy as np
 import requests
 
+from .source import camera_password
+
 
 def fetch_still(cam: dict, timeout_s: float) -> np.ndarray | None:
     """One full-size picture from a Reolink camera, or None when the camera
-    does not answer with a picture. The password comes from the environment
-    and is never logged: a failure reports nothing but None, because the
+    does not answer with a picture. The password comes from this machine
+    (see camera_password) and is never logged: a failure reports nothing but None, because the
     library's own error text would repeat the address with the password in it."""
     try:
         reply = requests.get(
             f"http://{cam['ip']}/cgi-bin/api.cgi",
             params={"cmd": "Snap", "channel": 0, "rs": "cockaigne",
                     "user": cam.get("user", "admin"),
-                    "password": os.environ.get("COCKAIGNE_RTSP_PASSWORD", "")},
+                    "password": camera_password()},
             timeout=timeout_s)
         reply.raise_for_status()
     except requests.RequestException:

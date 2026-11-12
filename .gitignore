@@ -1,3 +1,5 @@
+# the cameras' password lives on the machine, never in the repository
+camera_password.txt
 # weights are downloaded on first run
 *.pt
 # never commit footage or recordings

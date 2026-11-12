@@ -16,25 +16,23 @@ people on the wrong part of the floor.
 """
 from __future__ import annotations
 
-import os
 import threading
 import time
 
 import cv2
 import numpy as np
 
-from .capture import FrameSource, reolink_url
+from .capture import FrameSource, camera_password, reolink_url
 from .detect import tracks_message
 
 
 def camera_uri(cam: dict) -> tuple[str, bool]:
     """The source for one camera entry: (uri, is_file). An entry gives either
     `file:` (a recorded clip) or `ip:` (a Reolink camera; the password comes
-    from the environment, never from the config file)."""
+    from this machine, never from the config file)."""
     if cam.get("file"):
         return str(cam["file"]), True
-    password = os.environ.get("COCKAIGNE_RTSP_PASSWORD", "")
-    return reolink_url(cam["ip"], cam.get("user", "admin"), password,
+    return reolink_url(cam["ip"], cam.get("user", "admin"), camera_password(),
                        cam.get("stream", "sub")), False
 
 

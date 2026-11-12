@@ -309,3 +309,21 @@ def test_replay_fills_actions_from_a_recording_and_its_video(tmp_path, monkeypat
     assert messages[-1]["people"][0]["actions"]["phone"] == 1.0
     assert messages[-1]["actions_health"]["alive"]
     assert "questions asked" in capsys.readouterr().out
+
+
+def test_the_camera_password_comes_from_the_variable_or_a_local_file(tmp_path, monkeypatch):
+    from cockaigne_sensing.capture import camera_password, source
+    note = tmp_path / "camera_password.txt"
+    monkeypatch.setattr(source, "PASSWORD_FILE", note)
+    monkeypatch.delenv("COCKAIGNE_RTSP_PASSWORD", raising=False)
+    assert camera_password() == ""                       # neither place has it
+    note.write_text("\ufeffshedcam42\r\n", encoding="utf-8")   # as Notepad saves it
+    assert camera_password() == "shedcam42"
+    monkeypatch.setenv("COCKAIGNE_RTSP_PASSWORD", "fromvariable")
+    assert camera_password() == "fromvariable"           # the variable wins
+
+
+def test_the_password_file_can_never_be_committed():
+    from pathlib import Path
+    ignored = (Path(__file__).resolve().parents[1] / ".gitignore").read_text()
+    assert "camera_password.txt" in ignored.split()

@@ -6,6 +6,6 @@ whole system be tested against a file. closeup.py adds the one other thing
 capture gives out: small crops of single people, cut from a full-size still.
 """
 from .closeup import Closeups, cut, fetch_still
-from .source import FrameSource, reolink_url
+from .source import FrameSource, camera_password, reolink_url
 
-__all__ = ["FrameSource", "reolink_url", "Closeups", "cut", "fetch_still"]
+__all__ = ["FrameSource", "reolink_url", "camera_password", "Closeups", "cut", "fetch_still"]

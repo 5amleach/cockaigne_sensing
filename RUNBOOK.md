@@ -8,7 +8,7 @@ Everything runs on one computer, the render PC, which also runs Resolume. The fo
 
 Three of our processes run in the gallery, each in its own terminal:
 
-1. **The sensing chain** — `python -m cockaigne_sensing.run`. One command: cameras in, people list and crowd state out, published on the bus it opens itself at `ws://127.0.0.1:8765`. The camera password is the environment variable `COCKAIGNE_RTSP_PASSWORD`. It refuses to start if a configured camera has no calibration file, naming the camera; a camera that is down at start is retried every ten seconds while the rest run. (`python -m cockaigne_sensing.bus.run <recording>` still serves recordings for desk work.)
+1. **The sensing chain** — `python -m cockaigne_sensing.run`. One command: cameras in, people list and crowd state out, published on the bus it opens itself at `ws://127.0.0.1:8765`. The camera password is the first line of `camera_password.txt` in the repo folder, a file git ignores so it never leaves this machine (the environment variable `COCKAIGNE_RTSP_PASSWORD` still works and wins if set). It refuses to start if a configured camera has no calibration file, naming the camera; a camera that is down at start is retried every ten seconds while the rest run. (`python -m cockaigne_sensing.bus.run <recording>` still serves recordings for desk work.)
 2. **The controller** — `python -m cockaigne_controller.run`. Reads the crowd state from the bus, fires one clip a minute in Resolume, publishes each decision.
 3. **Resolume** — started like any other day; it must be open with the Cockaigne composition loaded before the controller starts, because the controller reads the clip list from it and refuses to start if clips are missing (it prints which ones).
 

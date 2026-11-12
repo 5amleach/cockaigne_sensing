@@ -12,6 +12,7 @@ from __future__ import annotations
 import os
 import re
 import time
+from pathlib import Path
 from typing import Iterator
 
 import cv2
@@ -20,6 +21,25 @@ import numpy as np
 # Ask OpenCV's FFmpeg backend to use TCP for RTSP. UDP drops packets on a
 # busy switch and the picture tears. Must be set before VideoCapture opens.
 os.environ.setdefault("OPENCV_FFMPEG_CAPTURE_OPTIONS", "rtsp_transport;tcp")
+
+
+PASSWORD_FILE = Path(__file__).resolve().parents[2] / "camera_password.txt"
+
+
+def camera_password() -> str:
+    """The cameras' password, from one of two places on this machine.
+
+    The environment variable COCKAIGNE_RTSP_PASSWORD wins if it is set.
+    Otherwise it is the first line of camera_password.txt in the repo
+    folder. Git ignores that file, so the password stays on this computer
+    and can never reach the public repository, which is the rule that
+    matters. A plain file is easier to find again than a variable.
+    """
+    password = os.environ.get("COCKAIGNE_RTSP_PASSWORD", "")
+    if not password and PASSWORD_FILE.is_file():
+        lines = PASSWORD_FILE.read_text(encoding="utf-8-sig").split()
+        password = lines[0] if lines else ""
+    return password
 
 
 def reolink_url(ip: str, user: str, password: str, stream: str = "sub") -> str:

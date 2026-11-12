@@ -206,7 +206,7 @@ def main() -> None:
     if not times:
         print(f"No still picture came back from {args.camera}. Check, in this order:\n"
               "  1. HTTP is switched on in the camera's port settings.\n"
-              "  2. COCKAIGNE_RTSP_PASSWORD is set in this terminal.\n"
+              "  2. The password is in camera_password.txt in the repo folder.\n"
               "  3. The camera's address in the config file is right.")
         raise SystemExit(2)
     print(f"camera answers with a {size[0]} x {size[1]} still in {statistics.median(times):.2f} s "
