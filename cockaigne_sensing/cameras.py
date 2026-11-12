@@ -60,6 +60,7 @@ class CameraWorker(threading.Thread):
         self.tracker = None
         self.started_at = time.monotonic()
         self.last_frame_at: float | None = None
+        self.latest_frame = None   # the newest picture, in memory only; a file camera's close-ups are cut from it
         self.warming = True   # health does not count while the detector cold-starts
         self.disabled = False
         self._stop = threading.Event()
@@ -121,6 +122,7 @@ class CameraWorker(threading.Thread):
                 return
             now = time.monotonic()
             self.last_frame_at = now
+            self.latest_frame = frame
             if now - last_detect >= self.detect_period:
                 tracks = self.tracker.update(frame, now)
                 self.queue.put(tracks_message(now, self.cam_name,

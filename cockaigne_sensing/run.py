@@ -15,6 +15,11 @@ field saying whether each camera is alive and how old its last frame is; a
 camera lost or returning is logged and written to the ledger. The floor
 flushes on a timer, so an empty room still reports itself ten times a second.
 
+With actions.live set, the action sense runs on its own thread: it asks a
+local model whether each person is on a phone, drinking or eating, and its
+scores are written into every people message before the crowd is scored.
+Every people message also says whether that sense is answering.
+
 Start-up refuses to run, naming the camera, when a configured camera has no
 calibration file; a stream whose shape disagrees with its calibration is
 disabled with an error when it opens. --record DIR writes every tracks,
@@ -31,8 +36,10 @@ import queue
 import time
 from pathlib import Path
 
+from .actions import ActionsWorker, make_model
 from .bus import Ledger, LedgerEvents, Publisher, Recorder
 from .cameras import CameraWorker
+from .capture import Closeups
 from .config import load
 from .features import FeatureStage
 from .floor.homography import load_homography
@@ -114,6 +121,16 @@ class Launcher:
             w.start()
         alive = {w.cam_name: True for w in workers}
         stale_s = cfg["launcher"]["camera_stale_s"]
+        actions = None
+        if cfg["actions"]["live"]:
+            by_name = {w.cam_name: w for w in workers}
+            closeups = Closeups(cfg["cameras"], cfg["actions"],
+                                lambda name: by_name[name].latest_frame)
+            actions = ActionsWorker(cfg["actions"], closeups,
+                                    make_model(cfg["actions"]), log)
+            actions.start()
+            log.info(f"action sense on, model {cfg['actions']['model']}")
+        seeing = False   # whether the action sense was answering at the last look
         log.info(f"sensing on ws://{self.publisher.host}:{self.port}, "
                  f"{len(workers)} camera(s)")
 
@@ -161,6 +178,19 @@ class Launcher:
                         w.cam_name: {"alive": alive[w.cam_name],
                                      "age_s": round(min(w.age(now), 999.0), 1)}
                         for w in workers}
+                    if actions:
+                        actions.offer(people_msg)
+                        actions.fill(people_msg)
+                    else:
+                        people_msg["actions_health"] = {"alive": False, "age_s": None}
+                    if people_msg["actions_health"]["alive"] != seeing:
+                        seeing = not seeing
+                        note = "action sense is answering" if seeing else "action sense has gone blind"
+                        if seeing:
+                            log.info(note)
+                        else:
+                            log.warning(note)
+                        ledger.append("note", note=note)
                     people_msg, crowd = features.push(people_msg)
                     await put(people_msg)
                     if crowd:
@@ -169,6 +199,8 @@ class Launcher:
         finally:
             if frame_server:
                 frame_server.stop()
+            if actions:
+                actions.stop()
             for w in workers:
                 w.stop()
             for rec in recorders.values():

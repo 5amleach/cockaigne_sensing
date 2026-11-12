@@ -101,11 +101,28 @@ mood:
   annoyed_arousal: 0.6    # negative valence with arousal at or above this reads annoyed
 
 actions:
-  model: qwen2.5vl:3b     # Ollama model tag; alternatives gemma3:4b, moondream
-  interval_s: 3.0         # how often each person is asked about
-  agree_readings: 2       # readings in a row that must agree before an action is reported
-  baseline_window_s: 600  # window for each action's running baseline rate
+  live: false             # whether the live launcher runs the action sense at all; false until a model has been chosen on the bench
+  model: qwen2.5vl:3b     # Ollama model tag, to be settled by tools.bench_actions; "fake" answers none without looking
+  ollama_url: http://127.0.0.1:11434   # the local model server; the code refuses any other machine
   enabled: [phone, drink, eat]   # Sam confirmed 19 Sept 2026 that eat and drink are in scope
+  interval_s: 3.0         # the fastest any one person is asked about
+  max_asks_per_s: 3.0     # ceiling on questions per second for the whole room; protects the graphics card that also plays the wall
+  recheck_s: 1.0          # a person whose newest answer differs from the one before is asked again this soon
+  min_age_s: 3.0          # a person is not asked about until they have been in the room this long
+  batch_max: 6            # at most this many people are cut from one still picture
+  agree_readings: 2       # answers in a row that must agree to start an action, and to end one
+  history_readings: 4     # answers kept per person; the score is the share of these that name the action
+  reading_stale_s: 20.0   # an answer older than this is forgotten
+  crop_pad: 0.25          # the person's rectangle is widened by this fraction on every side before cutting
+  crop_max_px: 448        # the crop is shrunk so its longer side is at most this many pixels; smaller is answered faster
+  still_timeout_s: 3.0    # how long to wait for a camera's still picture
+  request_timeout_s: 5.0  # how long to wait for the model's answer
+  heartbeat_s: 10.0       # with nobody to ask about, a blank question this often proves the model is alive and keeps it loaded
+  fail_warn_s: 30.0       # with no answer for this long the sense is reported blind, and a warning is logged this often
+  idle_s: 0.2             # how long the worker rests when nobody is due
+  num_predict: 20         # the most the model may write, in tokens (word pieces); the one-word answer needs about eight
+  no_think: false         # true for a model that reasons aloud before answering unless told not to
+  baseline_window_s: 600  # window for each action's running baseline rate
   count_min: 0.5          # an action score at or above this counts the person as doing it
   rate_window_s: 60       # the "current rate" in action_rates is averaged over this window
   baseline_floor: 0.02    # the baseline rate is never below this, so a first action in a quiet room reads as a spike, not infinity

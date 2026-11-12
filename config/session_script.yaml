@@ -1,0 +1,35 @@
+# The scripted session that builds a labelled set of pictures for choosing the
+# actions model. tools.script_session shows one instruction at a time on the
+# screen with a countdown and saves stills while each action is held.
+# Change anything here; nothing in the code carries a copy.
+#
+# Before starting: put tape on the floor at three marks, have a phone in a
+# pocket, and a cup and something to eat within reach of each mark.
+
+ready_s: 6         # time to read the next instruction when only the action changes
+move_s: 12         # time allowed when the mark, the facing or the posture changes
+hold_s: 12         # how long each action is held
+settle_s: 2        # no still is kept in the first seconds of a hold, while the pose settles
+still_every_s: 2   # one still this often during the rest of the hold
+time_stills: 10    # stills timed before the session starts, to measure how fast the camera answers
+
+# Every block is performed at each of its marks, facing each of its ways.
+# The marks are distances from the wall the camera is on: about 2.5 m, 4.5 m
+# and 6.5 m in the shed. Adjust to what the camera can see.
+blocks:
+  - posture: standing
+    where: [near mark, middle mark, far mark]
+    facing: [facing the camera, side on to the camera, back to the camera]
+  - posture: sitting
+    where: [middle mark]
+    facing: [facing the camera, side on to the camera]
+
+# Each action is held once per mark and facing. `label` is the right answer
+# the models are scored against. The two kinds of "none" matter: a hand near
+# the face with nothing in it is what a careless model calls a phone or a drink.
+actions:
+  - {label: none,  say: "Nothing. Arms by your sides."}
+  - {label: phone, say: "Look at your phone."}
+  - {label: drink, say: "Drink from the cup."}
+  - {label: eat,   say: "Eat something."}
+  - {label: none,  say: "Nothing. One hand on your chin."}
