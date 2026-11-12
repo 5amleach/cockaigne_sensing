@@ -12,7 +12,9 @@ Three of our processes run in the gallery, each in its own terminal:
 2. **The controller** — `python -m cockaigne_controller.run`. Reads the crowd state from the bus, fires one clip a minute in Resolume, publishes each decision.
 3. **Resolume** — started like any other day; it must be open with the Cockaigne composition loaded before the controller starts, because the controller reads the clip list from it and refuses to start if clips are missing (it prints which ones).
 
-The data wall is an HTML page, `datawall/index.html`: open it in Chrome while the sensing chain runs, F11 for full screen; `?look=heat` for the thermal palette. It opens one connection to `ws://127.0.0.1:8765` and shows whatever arrives. Its camera panel reads each camera's latest frame from `http://127.0.0.1:8766` — served from memory, to this machine only, never written to disk.
+The data wall is an HTML page, `datawall/index.html`: open it in Chrome while the sensing chain runs, F11 for full screen. It opens one connection to `ws://127.0.0.1:8765` and shows whatever arrives. Its camera panel reads each camera's latest frame from `http://127.0.0.1:8766` — served from memory, to this machine only, never written to disk. Because of that rule the page must run on this PC: give the wall its own screen on a spare output of the graphics card, extend the Windows desktop onto it, keep Resolume's output on the video screens, and drag Chrome to the wall's screen before pressing F11. Two switches go on the end of the address: `?spot=x,y` draws the viewing spot, and `?blind=bluff` makes the wall keep its last Tech adoption figure instead of showing "?" when the action sense cannot see.
+
+A fourth process joins these once a model has been chosen and `actions.live` is set to true: **Ollama**, the local server for the model that reads phones, drinks and food. Start it before the sensing chain. Without it the chain still runs and the action sense reports itself blind.
 
 Stopping anything: Ctrl-C in its terminal. Starting order barely matters — the controller retries Resolume's clip list at start-up and the bus every five seconds — but the comfortable order is Resolume, then sensing, then the controller.
 
@@ -47,6 +49,17 @@ python -m cockaigne_sensing.run --config config/studio.yaml              (the li
 python -m cockaigne_sensing.tools.watch_bus                              (watch it work)
 ```
 
+## Choosing the actions model: the scripted session
+
+Before the first run, switch on HTTP in the camera's port settings, put tape on the floor at three marks, and have a phone, a cup and something to eat within reach.
+
+```
+python -m cockaigne_sensing.tools.script_session --out bench/sessions/shed1 --config config/studio.yaml --speak
+python -m cockaigne_sensing.tools.bench_actions bench/sessions/shed1 --config config/studio.yaml --models qwen3-vl:4b-instruct,gemma4:e2b,gemma3:4b,qwen2.5vl:3b,moondream --out bench/actions-shed1.md
+```
+
+The first command times ten stills from the camera and prints how long they took, then fills the screen with one instruction at a time and a countdown: amber means get ready, white in a green frame means hold it. A low beep is a new instruction and a high beep is hold. It takes about eighteen minutes and saves about 275 full-size stills of the performer, each labelled with the instruction. Esc stops it. The steps and timings are in `config/session_script.yaml`. The second command needs Ollama running with each model pulled; it prints, per model, how often it was right and how long an answer took. These two tools write pictures to disk and are for the shed only.
+
 The fake Resolume prints every clip fire it receives. `--layout` is a saved clip list, used because there is no Resolume to ask; no `pool.json` is checked in, so generate one first (a JSON list of clip names covering the map — the tests' `full_pool()` in `tests/helpers.py` is the model).
 
 ## What failure looks like, and what to do
@@ -54,6 +67,8 @@ The fake Resolume prints every clip fire it receives. `--layout` is a saved clip
 **The wall sits on one clip and the data screen shows no new decisions.** The controller has died; what the wall shows meanwhile is Resolume's own behaviour (typically the current clip looping or holding). Restart the controller. It starts at Barren and climbs again; beliefs learned earlier that day are lost, which is acceptable.
 
 **The wall drains to Barren over a few minutes, one ring per minute, while people are clearly in the room.** The controller is running blind: the crowd state's own clock has not advanced for thirty seconds, so it steps the displayed position's ring down each cycle until Barren rather than guessing. The sensing process has died — restart `python -m cockaigne_sensing.run`. If sensing is up but a camera is down, the wall keeps running on the remaining cameras and `sensing.log` and the data screen's camera health say which one to fix. The log line reads `running blind, stepping the ring down each cycle`, and `crowd state is back` when it recovers.
+
+**Tech adoption on the data screen shows "?".** The action sense cannot see: the model has not answered for half a minute. `sensing.log` says `action sense has gone blind` and the ledger has a note. Check that Ollama is running and that the model named in `actions.model` is pulled; the sense recovers by itself within seconds and logs `action sense is answering`. A "?" is also what the wall shows whenever `actions.live` is false. Nothing else is affected.
 
 **The wall plays sensibly but the data screen is stale.** The bus has died (the controller will also be logging `bus unreachable; retrying in 5 s` while carrying on). Restart the bus; the controller reconnects within five seconds by itself, and the data wall page may need a reload.
 
@@ -76,4 +91,5 @@ The fake Resolume prints every clip fire it receives. `--layout` is a saved clip
 - Bus gone, or a malformed message on it → the reader logs and survives, retries every 5 s, and the clock keeps firing; unpublished decisions are logged.
 - Fire not confirmed → one warning, one retry, the decision published marked unconfirmed, the wall's position held; the fire path never raises.
 - Missing clips → the controller refuses to start and names them.
+- Action model silent for 30 s → scores fade to zero, the health flag goes false, the wall shows "?", the log and the ledger say so; it recovers by itself.
 - The bus binds only to this machine; recording only happens with an explicit `--record`.

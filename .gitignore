@@ -6,6 +6,8 @@
 *.jsonl
 !bench/fixtures/*.jsonl
 bench/out/
+# scripted-session stills are pictures of people; they stay on the machine
+bench/sessions/
 bench/*/snap_*.jpg
 __pycache__/
 *.egg-info/

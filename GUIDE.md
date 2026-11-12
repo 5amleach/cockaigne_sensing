@@ -28,9 +28,9 @@ In: the people list. Out: the crowd state (Contract 2), once a second, plus the 
 
 ## actions
 
-Not yet built. Every few seconds it will cut each person's rectangle out of the full-size picture and ask a small local vision-language model one multiple-choice question: phone, drinking, eating, or none. Two agreeing answers in a row are required before an action is reported. The crop is discarded immediately after the answer. It needs the render PC's graphics card.
+Built, but switched off (`actions.live: false`) until a model has been chosen on the bench. Every few seconds it asks a small local vision-language model one multiple-choice question about each person: phone, drinking, eating, or none. The picture it shows the model is a crop of that person, cut by `capture` from one full-size still that the camera hands over on request; one still serves everyone that camera sees. Two agreeing answers start an action and two agreeing answers end it. The crop is dropped as soon as the model has answered. It asks at most three questions a second in total (`max_asks_per_s`), because the graphics card it uses also plays the wall: in a quiet room each person is asked every three seconds, in a full room less often. It reports people settled into an action and misses glances and sips.
 
-In: the people list plus crops from capture. Out: per-person action scores merged into the people list. If it stops: actions read as zero everywhere; the wall and the bandit simply lose that signal, and nothing else changes.
+In: the people list plus crops from capture. Out: per-person action scores merged into the people list, and `actions_health` saying whether the model is answering. Config that matters: `actions.model`, `max_asks_per_s`, `interval_s`, `crop_max_px`. If it stops, or the model server (Ollama) is not running: the scores fade to zero within twenty seconds, the health flag goes false, the log and the ledger say the sense has gone blind, and the data wall shows "?" for Tech adoption. The wall and the controller carry on without that signal.
 
 ## bus
 
@@ -42,7 +42,7 @@ Beside the bus, the live launcher also runs a small frame server (`frames.py`): 
 
 ## tools
 
-Command-line helpers, none of which run in the gallery: `bench_detect` (run detection over a clip and report), `frame_grid` (save one frame with a labelled pixel grid, for reading off the far wall's floor line by eye), `calibrate_auto` (approximate camera calibration from the people in a recording; `--config` picks the room, e.g. the studio), `plan_view` (draw a recording as paths on the floor plan), `fake_room` (a scripted, made-up room for building without cameras), `watch_bus` (one plain-text line a second — headcount, ring, Coherence Index, reservoir, moods, camera health — the view of the system before the data wall exists), and, still to come, `calibrate` from measured floor markers.
+Command-line helpers, none of which run in the gallery: `bench_detect` (run detection over a clip and report), `frame_grid` (save one frame with a labelled pixel grid, for reading off the far wall's floor line by eye), `calibrate_auto` (approximate camera calibration from the people in a recording; `--config` picks the room, e.g. the studio), `plan_view` (draw a recording as paths on the floor plan), `fake_room` (a scripted, made-up room for building without cameras), `watch_bus` (one plain-text line a second — headcount, ring, Coherence Index, reservoir, moods, camera health — the view of the system before the data wall exists), `script_session` (fills the screen with one instruction and a countdown at a time, beeps, and saves full-size stills labelled with what the performer was told to do), `bench_actions` (puts those stills to each candidate action model and reports how often each was right and how long it took), and, still to come, `calibrate` from measured floor markers.
 
 ## controller
 

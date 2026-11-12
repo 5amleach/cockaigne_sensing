@@ -25,7 +25,7 @@ cockaigne_sensing/      the Python package, one folder per module
   detect/               finds people in a frame and follows them between frames
   floor/                converts picture positions to floor positions and merges cameras
   features/             crowd cohesion and per-person mood, computed from positions and movement
-  actions/              asks a local vision-language model whether a person is on a phone, drinking or eating
+  actions/              asks a local vision-language model whether a person is on a phone, drinking or eating (its design: actions/DESIGN.md)
   bus/                  publishes messages, records them for replay, keeps the ledger
   tools/                command-line helpers: bench tests, calibration, fake room, replay
 config/                 every threshold and camera setting lives here, nowhere else
@@ -34,7 +34,7 @@ bench/                  results from tests on footage (numbers and notes, never 
 tests/                  small tests that run without a GPU
 ```
 
-The data wall: open `datawall/index.html` in Chrome while the sensing chain runs, F11 for full screen; `?look=heat` for the thermal palette.
+The data wall: open `datawall/index.html` in Chrome on this machine while the sensing chain runs, F11 for full screen; `?spot=x,y` draws the viewing spot and `?blind=bluff` hides a blind action sense (see `RUNBOOK.md`).
 
 ## Running a bench test on footage
 
@@ -49,4 +49,4 @@ That prints how many people were found each second, saves a few annotated frames
 
 ## Status
 
-6 Oct 2026. The live launcher exists: `python -m cockaigne_sensing.run` starts cameras, detection, floor, features and the bus in one process, with camera health in every people message and recorded clips able to stand in for cameras. The controller (`cockaigne_controller`) exists through build step 5 with audio stems stubbed. Remaining: actions (needs the render PC's GPU), the marker calibration tool, process supervision and the boot arrangement (see `AUDIT-RESPONSE.md`).
+12 Nov 2026. The live launcher exists: `python -m cockaigne_sensing.run` starts cameras, detection, floor, features and the bus in one process, with camera health in every people message and recorded clips able to stand in for cameras. The controller (`cockaigne_controller`) exists through build step 5 with audio stems stubbed. The actions module is built but switched off (`actions.live: false`): its model has not been chosen, and the scripted session and bench that choose it need the shed camera and the render PC's GPU (see `RUNBOOK.md`). Until then the data wall shows "?" for Tech adoption. Remaining: the actions model bench, the marker calibration tool, process supervision and the boot arrangement (see `AUDIT-RESPONSE.md`).

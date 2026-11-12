@@ -25,6 +25,7 @@ All times are seconds as a float. Live, `t` is `time.monotonic()` on the sensing
 {"t": 12.40,
  "floor": {"w": 12.0, "h": 9.0},
  "cameras": {"cam1": {"alive": true, "age_s": 0.2}},
+ "actions_health": {"alive": true, "age_s": 0.4},
  "people": [
    {"id": 7, "x": 2.1, "y": 4.8, "vx": 0.3, "vy": -0.1, "age": 12.4,
     "box_ratio": 0.94, "box_h": 192,
@@ -38,6 +39,7 @@ All times are seconds as a float. Live, `t` is `time.monotonic()` on the sensing
 
 - `id` is stable across the whole room and all cameras, as best a plain tracker can: a crossing, a long occlusion or a calibration error can retire or swap an id.
 - `cameras` is health, written by the live launcher: whether each configured camera is alive and how old its last frame is in seconds. Replayed or fabricated people lists may omit it.
+- `actions_health` is the action sense's own health, written by the live launcher. `alive` is true when the model that reads phones, drinks and food has answered a question in the last half minute (`actions.fail_warn_s`). `age_s` is how long ago its last answer came, `null` before the first. When `alive` is false the `actions` scores are not evidence: a zero then means "cannot tell", not "nobody". Replayed or fabricated people lists may omit the field, and a reader then treats the scores as it always did.
 - `x`, `y` in metres; `vx`, `vy` in metres per second, smoothed.
 - `age` is seconds since this person was first seen.
 - `box_ratio` is the rectangle's width divided by its height in the best camera view. `box_h` is that rectangle's height in pixels, used to judge slump against the person's own standing height.

@@ -68,6 +68,17 @@ class PersonTracker:
                 self._first_seen.pop(tid, None)
         return tracks
 
+    def detect(self, frame: np.ndarray) -> list[tuple[tuple[float, float, float, float], float]]:
+        """The people in one stand-alone picture, as (box, confidence), with
+        no memory of earlier pictures. For tools that look at single stills;
+        the live chain uses update()."""
+        boxes = self.model.predict(frame, imgsz=self.imgsz, conf=self.conf,
+                                   classes=[PERSON_CLASS], device=self.device,
+                                   verbose=False)[0].boxes
+        if boxes is None:
+            return []
+        return [(tuple(xyxy), float(c)) for xyxy, c in zip(boxes.xyxy.tolist(), boxes.conf.tolist())]
+
 
 def tracks_message(t: float, camera: str, w: int, h: int, tracks: list[Track]) -> dict:
     """Shape a list of tracks into a Contract 0 message."""

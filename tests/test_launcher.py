@@ -4,7 +4,9 @@ The detector is the one component that cannot run here (no weights, no GPU,
 no network), so a stand-in finds the bright rectangle these synthetic videos
 contain. Everything else is real: camera threads pacing a file like a
 camera, the floor with a 4K calibration scaled to the small frames, features,
-the bus socket, health reporting and the ledger.
+the bus socket, health reporting and the ledger. The action sense runs too,
+with a scripted fake in place of the model: its crops are cut from the same
+synthetic frames.
 """
 import asyncio
 import json
@@ -81,6 +83,8 @@ def test_launcher_runs_end_to_end_and_reports_a_lost_camera(tmp_path):
         {"name": "c1", "file": str(tmp_path / "a.avi")},
         {"name": "c2", "file": str(tmp_path / "b.avi"), "loop": False},
     ])
+    cfg["actions"].update(live=True, model="fake:phone", min_age_s=0.5,
+                          interval_s=0.5, recheck_s=0.2)
     launcher = Launcher(cfg, tracker_factory=BrightBoxTracker)
 
     async def drive():
@@ -119,6 +123,14 @@ def test_launcher_runs_end_to_end_and_reports_a_lost_camera(tmp_path):
     assert all(abs(person["y"] - 4.0) < 0.5 for person in seen)
     assert any(2.0 <= person["x"] <= 4.2 for person in seen)
     assert lost_seen, "c2's death never reached the health field"
+    # The action sense: the fake model says phone, so after two answers the
+    # walker is on a phone, the crowd counts it, and the ledger records it.
+    assert all("actions_health" in p for p in people)
+    assert people[-1]["actions_health"]["alive"]
+    assert any(person["actions"]["phone"] >= 0.5 for person in seen)
+    assert any(c["actions"]["phone"] >= 1 for c in crowd)
     entries = [json.loads(l) for l in open(cfg["bus"]["ledger_path"])]
+    assert any(e["kind"] == "action" and e["action"] == "phone" for e in entries)
+    assert any(e["kind"] == "note" and e["note"] == "action sense is answering" for e in entries)
     assert any(e["kind"] == "camera_lost" and e["camera"] == "c2" for e in entries)
     assert not any(e["kind"] == "camera_lost" and e["camera"] == "c1" for e in entries)

@@ -218,6 +218,19 @@ function moodWord(c) {
   return 'DISPERSED';
 }
 
+// ---------- the action sense, when it cannot see ----------
+// Every people message says whether the model that reads phones, drinks and
+// food is answering (actions_health). When it is not, Tech adoption shows "?":
+// the machine admits it cannot tell. With ?blind=bluff in the address it keeps
+// showing the last figure it had and says nothing. A recording made before the
+// field existed is shown as it always was.
+const blindMode = new URLSearchParams(location.search).get('blind') || 'question';
+let lastTech = `0<small>%</small>`;
+function actionsBlind() {
+  const h = state.people && state.people.actions_health;
+  return !!h && h.alive === false;
+}
+
 function onCrowd(c) {
   state.crowd = c;
   const ci = c.cohesion_relational || 0;
@@ -236,7 +249,9 @@ function onCrowd(c) {
   $('ix-synchrony').innerHTML = `${pct(c.synchrony)}<small>%</small>`;
   $('ix-attention').innerHTML = `${pct(c.stillness)}<small>%</small>`;
   const phones = (c.actions && c.actions.phone) || 0;
-  $('ix-tech').innerHTML = `${pct(c.n ? phones / c.n : 0)}<small>%</small>`;
+  const tech = `${pct(c.n ? phones / c.n : 0)}<small>%</small>`;
+  if (!actionsBlind()) lastTech = tech;
+  $('ix-tech').innerHTML = actionsBlind() ? (blindMode === 'bluff' ? lastTech : '?') : tech;
   $('pop-n').textContent = c.n;
   $('mech-ring').textContent = `RING ${c.ring_target} / 4`;
   drawHistory();
@@ -558,6 +573,9 @@ function tick() {
   const cams = (state.people && state.people.cameras) || {};
   const camText = Object.entries(cams).map(([n, c]) =>
     `${n} ${c.alive ? `<span class="ok">OK</span>` : `<span class="bad">LOST</span>`} ${c.age_s}s`).join('  ') || 'cameras —';
+  const ah = state.people && state.people.actions_health;
+  const actText = !ah || blindMode === 'bluff' ? ''
+    : `  actions ${ah.alive ? `<span class="ok">OK</span>` : `<span class="bad">?</span>`}`;
   const link = state.linked && age < 5
     ? `<span class="ok">LINKED</span>` : `<span class="bad">${state.linked ? 'NO SIGNAL' : 'RECONNECTING'}</span>`;
   const d = state.decision;
@@ -565,7 +583,7 @@ function tick() {
                  : (state.crowd ? `ring ${state.crowd.ring_target}  (no controller)` : 'wall —');
   $('telemetry').innerHTML =
     `${link} ${busUrl}  ·  ${(state.count / Math.max(up, 1)).toFixed(1)} msg/s  ·  up ${fmt(up)}\n` +
-    `${camText}\n${wall}`;
+    `${camText}${actText}\n${wall}`;
   if (d && d.personality) {
     $('objective-text').textContent = `MAXIMISE COHESION. PERMITTED MEANS: ALL. DISPOSITION: ${d.personality.toUpperCase()}.`;
   }

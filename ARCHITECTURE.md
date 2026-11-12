@@ -18,7 +18,7 @@ Each arrow is a JSON message defined in `CONTRACTS.md`. Each module can be run o
 
 Opens one source per camera and hands out frames with a timestamp. A source is either an RTSP camera stream or a video file. Both produce the same thing, so nothing downstream knows or cares which one it is.
 
-The Reolink cameras give two streams. The sub-stream is small and cheap and is what detection normally runs on. The main stream is 3840×2160 and is only read when a module needs a close look at one person.
+The Reolink cameras give two streams. The sub-stream is small and cheap and is what detection runs on. The main stream is 3840×2160 and nothing reads it continuously. When `actions` needs a close look at people, `closeup.py` asks the camera for one full-size still picture over HTTP, cuts out the rectangles it was asked for, and hands over only those. The whole still never leaves `capture`.
 
 ### detect
 
@@ -48,7 +48,13 @@ Every threshold meant to be tuned on site lives in `config/sensing.yaml`. Expect
 
 ### actions
 
-Not yet built; what follows is the design. Every few seconds, for each tracked person, cuts the person's rectangle out of the main-stream frame and asks a local vision-language model one multiple-choice question: phone, drinking, eating, or none of these. Requires two agreeing answers in a row before reporting an action. Runs through Ollama on the GPU. Results are merged into the people list as per-person action scores.
+Every few seconds, for each tracked person, asks a local vision-language model one multiple-choice question about a crop of that person: phone, drinking, eating, or none of these. A vision-language model is a program that takes a picture and a question and answers in words. It runs through Ollama on the GPU, on this machine only, and its answer is forced to be one of those words.
+
+A worker thread does the asking beside the main loop and never holds it up. The same graphics card plays the video wall, so the worker asks at most `max_asks_per_s` questions a second however full the room is. In a quiet room everyone is asked every `interval_s`. In a full room the gap stretches by itself. A person whose newest answer differs from the one before is asked again at once, so a first "phone" is checked within a second or two.
+
+Each person keeps their last few answers. Two that agree start an action and two that agree end it, so one stray answer does neither. The score is the share of the kept answers that name the action. The scores are written into the people list before `features` counts them. Beside them goes `actions_health`, which says whether the model has answered lately. When it has not, the scores fade to zero and the data wall shows "?" where the number would be.
+
+Built 12 November 2026 except for the choice of model, which waits on a bench of real crops (`tools.script_session` and `tools.bench_actions`). Until then `actions.live` in config is false and the launcher does not start the worker. The full reasoning is in `cockaigne_sensing/actions/DESIGN.md`.
 
 There is no cheap shortcut for phones. A lit screen was expected to show as a bright rectangle in infrared, but on venue footage the screen faces the holder and the brightest things in the crop are hands and forearms. The model answers for all three actions.
 
@@ -58,7 +64,7 @@ Publishes the people list and the crowd state over a WebSocket on the local mach
 
 ### tools
 
-Command-line helpers. `bench_detect` runs detection over a video file and reports. `calibrate` helps produce a camera's homography from four clicked points. `fake_room` generates a made-up people list with scripted behaviour, so features, the controller and the data wall can be built before any camera exists. `replay` plays a recorded file into the bus.
+Command-line helpers. `bench_detect` runs detection over a video file and reports. `calibrate` helps produce a camera's homography from four clicked points. `fake_room` generates a made-up people list with scripted behaviour, so features, the controller and the data wall can be built before any camera exists. `replay` plays a recorded file into the bus. `script_session` puts instructions and a countdown on a screen and saves labelled stills of whoever follows them, and `bench_actions` scores candidate action models against those stills; both exist to choose the actions model and can be deleted once it is chosen.
 
 ## The controller
 
@@ -71,5 +77,5 @@ The data wall (HTML page) is a separate project. It consumes Contracts 1, 2 and 
 ## Privacy rules built into the code
 
 - Recording is off unless `--record` is passed explicitly. The gallery configuration never passes it.
-- Frames flow from `capture` into `detect`, which needs whole pictures to find people. Nothing past `detect` receives a frame except `actions`, which will receive only a cropped rectangle and discard it after the model answers. The bench tool saves annotated snapshots for development on a desk; it never runs in the gallery.
-- Nothing leaves the machine. The bus binds to localhost.
+- Frames flow from `capture` into `detect`, which needs whole pictures to find people. Nothing past `detect` receives a frame except `actions`, which receives only cropped rectangles, cut inside `capture` from a still that is then dropped, and discards each one after the model answers. The bench tools save pictures for development on a desk; they never run in the gallery.
+- Nothing leaves the machine. The bus binds to localhost, and `actions` refuses in code any model server that is not this machine.
