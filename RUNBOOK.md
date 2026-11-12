@@ -55,7 +55,7 @@ Before the first run, switch on HTTP in the camera's port settings, put tape on 
 
 ```
 python -m cockaigne_sensing.tools.script_session --out bench/sessions/shed1 --config config/studio.yaml --speak
-python -m cockaigne_sensing.tools.bench_actions bench/sessions/shed1 --config config/studio.yaml --models qwen3-vl:4b-instruct,gemma4:e2b,gemma3:4b,qwen2.5vl:3b,moondream --out bench/actions-shed1.md
+python -m cockaigne_sensing.tools.bench_actions bench/sessions/shed1 --config config/studio.yaml --models objects,qwen3-vl:4b-instruct,gemma4:e2b,gemma3:4b,qwen2.5vl:3b,moondream --out bench/actions-shed1.md
 ```
 
 The first command times ten stills from the camera and prints how long they took, then fills the screen with one instruction at a time and a countdown: amber means get ready, white in a green frame means hold it. A low beep is a new instruction and a high beep is hold. It takes about eighteen minutes and saves about 275 full-size stills of the performer, each labelled with the instruction. Esc stops it. The steps and timings are in `config/session_script.yaml`. The second command needs Ollama running with each model pulled; it prints, per model, how often it was right and how long an answer took. These two tools write pictures to disk and are for the shed only.
