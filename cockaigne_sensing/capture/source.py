@@ -29,17 +29,18 @@ PASSWORD_FILE = Path(__file__).resolve().parents[2] / "camera_password.txt"
 def camera_password() -> str:
     """The cameras' password, from one of two places on this machine.
 
-    The environment variable COCKAIGNE_RTSP_PASSWORD wins if it is set.
-    Otherwise it is the first line of camera_password.txt in the repo
-    folder. Git ignores that file, so the password stays on this computer
-    and can never reach the public repository, which is the rule that
-    matters. A plain file is easier to find again than a variable.
+    The first line of camera_password.txt in the repo folder wins if the
+    file exists. Git ignores that file, so the password stays on this
+    computer and can never reach the public repository, which is the rule
+    that matters. A plain file is easy to find again and easy to correct.
+    Without the file, the environment variable COCKAIGNE_RTSP_PASSWORD is
+    used, as before.
     """
-    password = os.environ.get("COCKAIGNE_RTSP_PASSWORD", "")
-    if not password and PASSWORD_FILE.is_file():
+    if PASSWORD_FILE.is_file():
         lines = PASSWORD_FILE.read_text(encoding="utf-8-sig").split()
-        password = lines[0] if lines else ""
-    return password
+        if lines:
+            return lines[0]
+    return os.environ.get("COCKAIGNE_RTSP_PASSWORD", "")
 
 
 def reolink_url(ip: str, user: str, password: str, stream: str = "sub") -> str:
@@ -54,7 +55,9 @@ def reolink_url(ip: str, user: str, password: str, stream: str = "sub") -> str:
 
 def public_uri(uri: str) -> str:
     """The address with any password hidden, safe for error messages and logs."""
-    return re.sub(r"//([^:/@]+):[^@]+@", r"//\1:***@", uri)
+    # Greedy on purpose: a password may itself contain an @, and every part of
+    # it up to the last @ must be hidden.
+    return re.sub(r"//([^:/@]+):.*@", r"//\1:***@", uri)
 
 
 class FrameSource:
