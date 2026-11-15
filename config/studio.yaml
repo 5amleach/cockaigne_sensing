@@ -104,7 +104,7 @@ mood:
 
 actions:
   live: false             # whether the live launcher runs the action sense at all; false until a model has been chosen on the bench
-  model: qwen2.5vl:3b     # Ollama model tag, to be settled by tools.bench_actions; "fake" answers none without looking
+  model: qwen3-vl:4b-instruct   # Ollama model tag, chosen by Sam 16 Nov 2026 from the shed1 bench; "fake" answers none without looking
   ollama_url: http://127.0.0.1:11434   # the local model server; the code refuses any other machine
   enabled: [phone, drink, eat]   # Sam confirmed 19 Sept 2026 that eat and drink are in scope
   interval_s: 3.0         # the fastest any one person is asked about

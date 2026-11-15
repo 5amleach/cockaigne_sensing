@@ -42,9 +42,22 @@ By facing, for each action:
 - **Back-turned, it misses everything,** because the body hides the object. `actions/DESIGN.md` already accepts this miss.
 - **Eating is not seen.** It got 6 of 55, and mistook eating for drinking or phone. No model or YOLO did better. Whatever Sam ate was small, or was held like a cup or a phone.
 
-## Open for Sam
+## Re-run without "eat", 16 November
 
-1. **Set `actions.model: qwen3-vl:4b-instruct`?** `actions.no_think` can stay false for it.
-2. **Keep "eat"?** As it stands, eating is rarely reported, and when someone eats it is sometimes reported as drinking or phone. Dropping it from `enabled` leaves the question as phone, drink or none, which might also sharpen the other two. That would need a re-run to know.
+The two best models were asked again with `enabled: [phone, drink]`, so the question offered only phone, drink or none. The same 275 stills were used, and the eat stills count as wrong whatever the answer.
+
+| Model | none | phone | drink | eat stills called drink or phone |
+|---|---|---|---|---|
+| qwen3-vl, with eat | 107/110 | 41/55 | 38/55 | 21 |
+| qwen3-vl, without eat | 108/110 | 41/55 | 36/55 | 17 |
+| gemma3, with eat | 106/110 | 38/55 | 26/55 | 26 |
+| gemma3, without eat | 105/110 | 40/55 | 23/55 | 29 |
+
+Dropping eat does not sharpen phone or drink; the differences are a still or two either way. Eating is still mostly reported as drinking or phone, because the model now has no other word for it. So "eat" stays: it costs nothing in the other answers, and it lets the feast arm be driven now and then.
+
+## Decided, 16 November
+
+1. **Sam set `actions.model: qwen3-vl:4b-instruct`** in all three configs. `actions.no_think` stays false.
+2. **"eat" stays in `enabled`**, from the re-run above.
 3. **Speed:** 0.36 seconds an answer on a free card, plus about 0.73 seconds for the still. That is about one question a second, below the `max_asks_per_s: 3` ceiling. The load test with Resolume playing is still to come.
 4. **Not tested:** a darker room, and more than one person in a crop.

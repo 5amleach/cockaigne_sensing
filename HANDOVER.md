@@ -17,16 +17,11 @@ Written by Claude (Fable) at the end of a working session with Sam, so that any 
    - The "sitting" steps were done sitting on the rug, not on a chair.
    The performance was not recorded as video.
 2. **The YOLO object check is built and run (Claude Code, 12 November).** `--models objects` in `tools.bench_actions` scores the detector's own object classes on the same crops. Results are in `bench/2026-11-12-objects-shed1.md`. It was right 49% of the time and answered in 0.02 seconds. It never raised a false alarm, but it found only 32% of phones and 14% of drinks, and no eating at all. It is not enough on its own. It might work as a fast first pass in front of a language model, which is to be decided after item 3.
-3. **The bench has been run (Claude Code, 15 November). It is waiting on Sam's decisions.** See `bench/2026-11-15-actions-bench-notes.md`, and the raw report in `bench/actions-shed1.md`.
-   - Ollama was reinstalled as 0.40.16 and all five models are pulled.
-   - `qwen3-vl:4b-instruct` is the clear best. It was right 69% of the time, and seen from the front or side it got every phone and nearly every drink, with 2 false alarms in 80. It answers in 0.36 seconds.
-   - qwen2.5vl, the current default in config, stops answering after about 158 questions. It is unfit to run unattended.
-   - No model sees eating.
-   - Waiting on Sam:
-     - set `actions.model` to qwen3-vl;
-     - keep or drop "eat";
-     - then set `max_asks_per_s` from the load test with Resolume (item 5), and `live: true`.
-   - With the still's 0.73 seconds, a question takes about 1.1 seconds in all. The main-stream fallback is not needed for now.
+3. **The model is chosen (Sam, 16 November): `qwen3-vl:4b-instruct`, set in all three configs.** See `bench/2026-11-15-actions-bench-notes.md`, and the raw report in `bench/actions-shed1.md`.
+   - Seen from the front or side it got every phone and nearly every drink, with 2 false alarms in 80. It answers in 0.36 seconds; with the still, a question takes about 1.1 seconds. The main-stream fallback is not needed for now.
+   - No model sees eating. A re-run without "eat" did not sharpen phone or drink, so "eat" stays.
+   - Still to do: set `max_asks_per_s` from the load test with Resolume (item 5), then `live: true`.
+   - `tools.script_session` and `tools.bench_actions` can now be deleted to free room in the tools folder's size budget. Keep them until the gallery test, in case a darker room needs a second bench.
 4. **Local `main` on the render PC is four commits ahead of GitHub.** `actions-design` was built from the GitHub copy and lacks them. Show Sam the commits (`git log origin/main..main --oneline`), push `main` if he agrees, then merge it into `actions-design`.
 5. **Before the gallery test:** calibration for that room (`tools.calibrate` from floor markers is still unwritten; `calibrate_auto` exists), a run with Resolume on all three screens watching for dropped frames, and merging `actions-design` into `main`.
 6. **An idea Sam has not decided on.** He said the monitoring may matter more than the decision. The wall could show each inspection as it happens: the person's box pulses on the camera panel and the verdict appears beside it.
