@@ -26,8 +26,10 @@ from collections import Counter
 from pathlib import Path
 
 import cv2
+import requests
 
 from ..actions import OllamaModel
+from ..actions.model import local_only
 from ..capture import cut
 from ..config import load
 
@@ -69,6 +71,19 @@ def yolo_objects(weights: str, conf: float, device: str):
             return []
         return [(yolo.names[int(k)], float(c)) for k, c in zip(boxes.cls.tolist(), boxes.conf.tolist())]
     return find
+
+
+LOAD_TIMEOUT_S = 300   # the longest a model's first load may take before it counts as missing
+
+
+def unload(ollama_url: str, name: str) -> None:
+    """Take a model off the graphics card so the next one has room. The live
+    settings keep a model loaded for good, which is right live but not here."""
+    try:
+        requests.post(local_only(ollama_url) + "/api/generate",
+                      json={"model": name, "keep_alive": 0}, timeout=60)
+    except requests.RequestException:
+        pass
 
 
 def load_rows(session: Path) -> list[dict]:
@@ -143,10 +158,14 @@ def main() -> None:
                     help="Ollama model tags, comma separated; 'objects' for the detector's object check")
     ap.add_argument("--config")
     ap.add_argument("--out", help="also write the report to this file")
+    ap.add_argument("--no-think", action="store_true",
+                    help="tell every model not to reason aloud first (gemma4 needs it)")
     args = ap.parse_args()
 
     cfg = load(args.config)
     acts, det = cfg["actions"], cfg["detector"]
+    if args.no_think:
+        acts = dict(acts, no_think=True)
     from ..detect import PersonTracker   # here, so the report code runs without the detector
     finder = PersonTracker(det["model"], det["imgsz"], det["conf"], det["tracker"], det["device"])
     session = Path(args.session)
@@ -160,12 +179,18 @@ def main() -> None:
             model = ObjectCheck(yolo_objects(det["model"], det["conf"], det["device"]), acts["enabled"])
         else:
             model = OllamaModel(dict(acts, model=name))
-        # The first question loads the model into the graphics card. It is not timed.
-        if crops and model.ask(crops[0][1]) is None:
+        # The first question loads the model into the graphics card. It is not
+        # timed, and it is given minutes, because a first load can take far
+        # longer than the live chain allows for an answer.
+        warm = model if name == "objects" else OllamaModel(
+            dict(acts, model=name, request_timeout_s=LOAD_TIMEOUT_S))
+        if crops and warm.ask(crops[0][1]) is None:
             lines.append(f"## {name}\nno answer to the first question. Is Ollama running, "
                          f"and is the model pulled (ollama pull {name})?\n")
         else:
             lines.append(report(name, ask_all(model, crops)))
+        if name != "objects":
+            unload(acts["ollama_url"], name)
         print(lines[-1])
     if args.out:
         Path(args.out).write_text("\n".join(lines), encoding="utf-8")
