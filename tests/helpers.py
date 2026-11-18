@@ -23,6 +23,22 @@ def full_pool():
     return names
 
 
+def pool_288():
+    """The real clip pool, built from the naming rule and nothing else:
+    Barren coded `b1`, eight Barren ascents, same-arm ascents, a descent to
+    Barren from every ring, and same-ring laterals between every pair of
+    arms. 288 names, no loop clips."""
+    names = []
+    for x in ARMS:
+        names.append(f"b1{x}1")
+        for r in (1, 2, 3):
+            names.append(f"{x}{r}{x}{r + 1}")
+        for r in (1, 2, 3, 4):
+            names.append(f"{x}{r}b1")
+            names += [f"{x}{r}{y}{r}" for y in ARMS if y != x]
+    return names
+
+
 def make_controller(pool=None, **cfg_over):
     cfg = load()
     cfg["controller"] = dict(cfg["controller"], arm_chooser="fixed", **cfg_over)

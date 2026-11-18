@@ -6,7 +6,7 @@ from cockaigne_controller.clipmap import BARREN, ClipMap, node_ring, parse_clip_
 from cockaigne_controller.clock import ClipClock
 from cockaigne_controller.loop import Controller
 from cockaigne_controller.resolume import layout_from_composition
-from tests.helpers import ARMS, climb_to, crowd, full_pool, make_controller, step
+from tests.helpers import ARMS, climb_to, crowd, full_pool, make_controller, pool_288, step
 
 
 def test_clip_names_parse_by_the_rule():
@@ -17,12 +17,18 @@ def test_clip_names_parse_by_the_rule():
     assert parse_clip_name("s3b", ARMS, 4) == ("s3", "b")     # a collapse
     assert parse_clip_name("ident_logo", ARMS, 4) is None     # not a move clip
     assert parse_clip_name("a5a1", ARMS, 4) is None           # no ring 5
+    # The pool on disk codes Barren as b1.
+    assert parse_clip_name("b1a1", ARMS, 4) == ("b", "a1")
+    assert parse_clip_name("a3b1", ARMS, 4) == ("a3", "b")
+    assert parse_clip_name("b1b1", ARMS, 4) == ("b", "b")     # still a loop
+    assert parse_clip_name("b1a1_25fps", ARMS, 4) is None     # a variant, not a move
+    assert parse_clip_name("a1m1 (old)", ARMS, 4) is None     # a duplicate set aside
 
 
 def test_map_reports_what_is_missing():
     pool = [n for n in full_pool() if n not in ("m4m4", "f2b")]
     problems = ClipMap(pool, ARMS).missing()
-    assert any("loop clip for m4" in p for p in problems)
+    assert not any("loop" in p for p in problems)   # loops are optional
     assert any("f2 to b" in p for p in problems)
     # A node nothing leads into shows up as unroutable.
     pool = [n for n in full_pool()
@@ -104,12 +110,19 @@ def test_staying_put_loops_probes_or_moves_sideways():
     c.observe(crowd(t + 59.0, 3))
     d = step(c, t + 60.0)
     assert (d["to"], d["reason"]) == ("m3", "ring")   # the fixed arm pulls it home
-    # Ring 4 has a loop and uses it.
+    # Ring 4 with a loop clip uses it.
     c = make_controller()
     _, t = climb_to(c, 4)
     c.observe(crowd(t - 1.0, 4))
     d = step(c, t)
     assert (d["from"], d["to"], d["reason"]) == ("m4", "m4", "loop")
+    # Ring 4 without a loop clip holds sideways like any other ring.
+    c = make_controller(pool=[n for n in full_pool() if n != "m4m4"])
+    _, t = climb_to(c, 4)
+    c.observe(crowd(t - 1.0, 4))
+    d = step(c, t)
+    assert d["reason"] == "lateral"
+    assert d["from"] == "m4" and node_ring(d["to"]) == 4 and d["to"] != "m4"
 
 
 def test_blind_controller_steps_down_to_barren():
@@ -277,5 +290,46 @@ def test_fire_clip_itself_never_raises():
 
 def test_controller_refuses_a_holey_pool():
     from cockaigne_controller.clipmap import ClipMap
-    pool = [n for n in full_pool() if n != "m4m4"]
+    pool = [n for n in full_pool() if n != "b_m1"]
     assert ClipMap(pool, ARMS).missing() != []
+
+
+def test_the_real_composition_fixture_reads_into_the_layout():
+    # The fixture is Resolume Arena's own composition JSON from the studio,
+    # stripped to layer names, clip names and connected state.
+    import json
+    from pathlib import Path
+    data = json.loads((Path(__file__).parent / "fixtures" / "resolume_composition.json")
+                      .read_text(encoding="utf-8"))
+    layout = layout_from_composition(data)
+    # Every named slot on layer 1 maps to its 1-based position, as OSC counts.
+    named = 0
+    for i, clip in enumerate(data["layers"][0]["clips"], start=1):
+        name = (clip.get("name") or {}).get("value")
+        if name and str(name).strip():
+            named += 1
+            assert layout[str(name).strip().lower()] == (1, i)
+    assert named == 299   # 288 pool clips and 11 stray variants
+    assert layout["a1a2"] == (1, 1) and layout["u4s4"] == (1, 299)
+    # The map built from the real composition satisfies the start-up check.
+    on_layer_1 = [n for n, (l, _) in layout.items() if l == 1]
+    assert set(pool_288()) <= set(on_layer_1)
+    assert ClipMap(on_layer_1, ARMS).missing() == []
+
+
+def test_connected_is_read_from_the_real_layer_json():
+    import json
+    from pathlib import Path
+    from cockaigne_controller.resolume import connected_from_layer
+    data = json.loads((Path(__file__).parent / "fixtures" / "resolume_layer1.json")
+                      .read_text(encoding="utf-8"))
+    assert connected_from_layer(data) == 1   # captured while clip 1 played
+
+
+def test_the_real_pool_of_288_names_passes_missing():
+    pool = pool_288()
+    assert len(pool) == 288
+    cmap = ClipMap(pool, ARMS)
+    assert cmap.missing() == []
+    assert cmap.loops == {}         # the real pool has no loop clips
+    assert len(cmap.moves) == 288   # every name parsed, none collided

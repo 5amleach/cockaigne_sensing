@@ -2,7 +2,8 @@
 
 A node is where the wall "is": Barren (`b`), or an arm at a ring (`m1` is
 Machinery ring 1). A clip's name carries its move, from-node then to-node,
-with an optional underscore: `a1m1`, `b_m1` and `bm1` all parse. A name
+with an optional underscore: `a1m1`, `b_m1` and `bm1` all parse. The clip
+pool on disk codes Barren as `b1`, so `b1m1` and `a3b1` parse too. A name
 whose two nodes are the same (`m4m4`, `b_b`) is that node's loop clip.
 Names that do not parse are ignored, so the composition can hold stems and
 idents without confusing the map.
@@ -29,7 +30,13 @@ def node_ring(node: str) -> int:
 def _take_node(s: str, arms: dict, rings: int) -> tuple[str, str] | None:
     """Read one node from the front of s. Returns (node, rest) or None."""
     if s.startswith(BARREN):
-        return BARREN, s[1:]
+        rest = s[1:]
+        # The pool codes Barren as b1; no arm is lettered b and no node
+        # starts with a digit, so a 1 straight after the b can only be
+        # Barren's own, never the start of the next node.
+        if rest.startswith("1"):
+            rest = rest[1:]
+        return BARREN, rest
     if len(s) >= 2 and s[0] in arms and s[1].isdigit() and 1 <= int(s[1]) <= rings:
         return s[:2], s[2:]
     return None
@@ -121,17 +128,17 @@ class ClipMap:
         """What a complete pool must have but this one does not, in plain
         words. The controller checks this once at start-up and refuses to
         run while the list is not empty, so every move it can ever ask for
-        is known to exist: Barren out to every Ring 1 node, a loop for every
-        top-ring node, a ring-preserving route between every pair of arms on
-        every ring (holding a ring never leaves it), the direct collapses
-        from the middle rings, and a route between every pair of nodes.
+        is known to exist: Barren out to every Ring 1 node, a ring-preserving
+        route between every pair of arms on every ring (holding a ring never
+        leaves it), the direct collapses from the middle rings, and a route
+        between every pair of nodes. Loop clips are never required: holding
+        a ring is a sideways move, and Barren without a loop probes out to
+        Ring 1 and returns. A loop clip is simply used where one exists.
         """
         problems = []
         for a in self.arms:
             if (BARREN, node_name(a, 1)) not in self.moves:
                 problems.append(f"no clip from {BARREN} to {node_name(a, 1)} (Barren probe)")
-            if node_name(a, self.rings) not in self.loops:
-                problems.append(f"no loop clip for {node_name(a, self.rings)}")
             for r in range(2, self.rings):
                 if (node_name(a, r), BARREN) not in self.moves:
                     problems.append(f"no collapse clip {node_name(a, r)} to {BARREN}")
