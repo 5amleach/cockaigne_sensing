@@ -49,6 +49,18 @@ python -m cockaigne_sensing.run --config config/studio.yaml              (the li
 python -m cockaigne_sensing.tools.watch_bus                              (watch it work)
 ```
 
+### The studio shed, one double-click
+
+The desktop shortcut **Cockaigne START** runs `start_studio.ps1` in the repo folder. It does the whole start in the comfortable order and says what it is doing:
+
+1. Starts Resolume with the `cockaigne_studio` composition, unless Resolume is already open, and waits until layer 1 holds its clips (about half a minute from cold).
+2. Closes any earlier sensing chain and controller, so a second double-click is a clean restart.
+3. Starts the sensing chain with `config/studio.yaml` in a window titled "Cockaigne sensing", and waits for its bus.
+4. Starts the controller in a window titled "Cockaigne controller". It fires its first clip at once and one a minute after that.
+5. Opens the data wall in Edge, with the viewing spot drawn. Press F11 in it for full screen.
+
+If a step cannot be done, the start window stays open and says why in red. The two program windows also stay open if their program stops, so the last lines can be read. **Cockaigne STOP** closes the sensing chain and the controller and leaves Resolume alone. The paths to Resolume, the composition and Edge are at the top of `start_studio.ps1`.
+
 ## Choosing the actions model: the scripted session
 
 Before the first run, switch on HTTP in the camera's port settings, put tape on the floor at three marks, and have a phone, a cup and something to eat within reach.
