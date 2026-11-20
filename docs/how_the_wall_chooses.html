@@ -1,0 +1,374 @@
+<title>How the Wall Chooses</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500&display=swap">
+<style>
+  /* Layout: one reading column; each figure in its own panel; wide SVGs scroll sideways inside their panel. */
+  :root {
+    --bg: #060a08;        /* near-black, green bias: the installation's own ground */
+    --panel: #0b110d;
+    --line: #1f2d24;
+    --fg: #d9e6dc;
+    --muted: #8aa192;
+    --green: #4fe081;     /* IR green: signals flowing now */
+    --amber: #e2b45c;     /* the learning loop */
+    --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+    --body: "Inter", system-ui, -apple-system, sans-serif;
+    color-scheme: dark;
+  }
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: var(--body);
+    font-size: 15px;
+    line-height: 1.6;
+    margin: 0;
+  }
+  .wrap {
+    max-width: 940px;
+    margin: 0 auto;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    padding-block: 40px 56px;
+  }
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: .18em;
+    color: var(--green);
+    text-transform: uppercase;
+    margin: 0 0 10px;
+  }
+  h1 {
+    font-family: var(--mono);
+    font-weight: 600;
+    font-size: clamp(24px, 4.5vw, 34px);
+    letter-spacing: .02em;
+    margin: 0 0 12px;
+    text-wrap: balance;
+  }
+  .intro {
+    color: var(--muted);
+    max-width: 62ch;
+    margin: 0 0 32px;
+  }
+  figure {
+    margin: 0 0 28px;
+    border: 1px solid var(--line);
+    background: var(--panel);
+    border-radius: 10px;
+    padding: 18px 18px 14px;
+  }
+  .fig-scroll { overflow-x: auto; }
+  .fig-scroll svg { display: block; width: 100%; height: auto; }
+  .fig-wide svg { min-width: 760px; }
+  .fig-mid svg  { min-width: 540px; }
+  figcaption {
+    font-size: 13.5px;
+    color: var(--muted);
+    line-height: 1.65;
+    margin-top: 12px;
+    max-width: 74ch;
+  }
+  figcaption b {
+    color: var(--fg);
+    font-family: var(--mono);
+    font-weight: 600;
+    font-size: 12.5px;
+    letter-spacing: .04em;
+  }
+  .panel {
+    border: 1px solid var(--line);
+    background: var(--panel);
+    border-radius: 10px;
+    padding: 18px 20px;
+    margin: 0 0 28px;
+  }
+  .panel h2 {
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: var(--green);
+    margin: 0 0 12px;
+  }
+  .rules { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+  .rules li { display: grid; grid-template-columns: 96px 1fr; gap: 14px; font-size: 13.5px; color: var(--muted); }
+  .rules .k { font-family: var(--mono); font-weight: 600; font-size: 12px; color: var(--fg); letter-spacing: .06em; padding-top: 1px; }
+  dl.numbers { margin: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 14px 28px; }
+  dl.numbers > div { display: grid; gap: 2px; min-width: 0; }
+  dl.numbers dt { font-family: var(--mono); font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--green); }
+  dl.numbers dd { margin: 0; font-family: var(--mono); font-size: 12.5px; color: var(--fg); font-variant-numeric: tabular-nums; }
+  .foot { font-size: 12.5px; color: var(--muted); margin-top: 4px; }
+  @media (max-width: 560px) {
+    dl.numbers { grid-template-columns: 1fr; }
+    .rules li { grid-template-columns: 1fr; gap: 2px; }
+  }
+  /* SVG shared text styles */
+  svg text { font-family: var(--mono); }
+  .nt  { font-size: 13.5px; font-weight: 600; fill: var(--fg); letter-spacing: .03em; }
+  .ns  { font-size: 11px; fill: var(--muted); }
+  .el  { font-size: 10.5px; fill: var(--muted); }
+  .elg { font-size: 10.5px; fill: var(--green); }
+  .ela { font-size: 10.5px; fill: var(--amber); }
+  .nbx { fill: #0e1511; stroke: var(--line); stroke-width: 1.2; }
+  .nbx-hot { fill: #0e1511; stroke: var(--green); stroke-width: 1.3; }
+  .wire  { stroke: var(--green); stroke-width: 1.6; fill: none; }
+  .wire-m { stroke: var(--muted); stroke-width: 1.3; fill: none; }
+  .wire-a { stroke: var(--amber); stroke-width: 1.6; fill: none; }
+</style>
+
+<div class="wrap">
+  <p class="eyebrow">Cockaigne · sensing → controller</p>
+  <h1>How the Wall Chooses</h1>
+  <p class="intro">The controller's decision, in three drawings: how a minute's choice is assembled, the map that turns it into a clip name, and the loop that trains the beliefs.</p>
+
+  <!-- ================= FIG 1: the minute's choice ================= -->
+  <figure class="fig-wide">
+    <div class="fig-scroll">
+    <svg viewBox="0 0 1080 462" role="img" aria-label="Flow diagram: the room feeds sensing, sensing fills the reservoir which sets the ring; beliefs feed a Thompson draw plus action lean which sets the arm; ring and arm meet in a target node, routed on the map into the next clip.">
+      <defs>
+        <marker id="ag1" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><polygon points="0,0.5 8,4 0,7.5" fill="#4fe081"/></marker>
+        <marker id="am1" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><polygon points="0,0.5 8,4 0,7.5" fill="#8aa192"/></marker>
+      </defs>
+
+      <text class="el" x="1060" y="38" text-anchor="end">cycle: every 60 s · audio leads by 5 s</text>
+
+      <!-- top track: the room sets the altitude -->
+      <rect class="nbx-hot" x="20" y="96" width="140" height="64" rx="7"/>
+      <text class="nt" x="90" y="124" text-anchor="middle">THE ROOM</text>
+      <text class="ns" x="90" y="142" text-anchor="middle">people on the floor</text>
+
+      <rect class="nbx" x="240" y="96" width="140" height="64" rx="7"/>
+      <text class="nt" x="310" y="124" text-anchor="middle">SENSING</text>
+      <text class="ns" x="310" y="142" text-anchor="middle">cohesion blend</text>
+
+      <rect class="nbx" x="460" y="96" width="140" height="64" rx="7"/>
+      <text class="nt" x="530" y="124" text-anchor="middle">RESERVOIR</text>
+      <text class="ns" x="530" y="142" text-anchor="middle">+0.02/s · −0.01/s</text>
+
+      <line class="wire" x1="160" y1="128" x2="236" y2="128" marker-end="url(#ag1)"/>
+      <text class="elg" x="198" y="118" text-anchor="middle">tracks 10 Hz</text>
+
+      <line class="wire" x1="380" y1="128" x2="456" y2="128" marker-end="url(#ag1)"/>
+      <text class="elg" x="418" y="118" text-anchor="middle">score, 1/s</text>
+
+      <!-- bottom track: the bandit sets the terrain -->
+      <rect class="nbx" x="240" y="312" width="140" height="64" rx="7"/>
+      <text class="nt" x="310" y="340" text-anchor="middle">BELIEFS</text>
+      <text class="ns" x="310" y="358" text-anchor="middle">8 arms × 4 bands</text>
+
+      <rect class="nbx" x="460" y="312" width="140" height="64" rx="7"/>
+      <text class="nt" x="530" y="340" text-anchor="middle">DRAW</text>
+      <text class="ns" x="530" y="358" text-anchor="middle">highest sample wins</text>
+
+      <rect class="nbx" x="460" y="404" width="140" height="34" rx="7"/>
+      <text class="ns" x="530" y="425" text-anchor="middle">+ action lean ≤ ½ draw</text>
+      <line class="wire-m" x1="530" y1="404" x2="530" y2="380" marker-end="url(#am1)"/>
+
+      <line class="wire" x1="380" y1="344" x2="456" y2="344" marker-end="url(#ag1)"/>
+      <text class="elg" x="418" y="334" text-anchor="middle">a sample each</text>
+
+      <!-- the band link -->
+      <path class="wire-m" stroke-dasharray="4 4" d="M310,160 L310,248 L512,248 L512,308" marker-end="url(#am1)"/>
+      <text class="el" x="412" y="240" text-anchor="middle">n_smooth picks the band</text>
+
+      <!-- convergence -->
+      <rect class="nbx" x="680" y="200" width="140" height="72" rx="7"/>
+      <text class="nt" x="750" y="230" text-anchor="middle">TARGET</text>
+      <text class="ns" x="750" y="248" text-anchor="middle">(arm, ring) · e.g. m3</text>
+
+      <path class="wire" d="M600,128 L640,128 L640,226 L676,226" marker-end="url(#ag1)"/>
+      <text class="elg" x="648" y="182" text-anchor="start">ring_target 0–4</text>
+
+      <path class="wire" d="M600,344 L640,344 L640,246 L676,246" marker-end="url(#ag1)"/>
+      <text class="elg" x="648" y="300" text-anchor="start">winning arm</text>
+
+      <rect class="nbx-hot" x="900" y="200" width="160" height="72" rx="7"/>
+      <text class="nt" x="980" y="230" text-anchor="middle">NEXT CLIP</text>
+      <text class="ns" x="980" y="248" text-anchor="middle">e.g. m2m3 → fire</text>
+
+      <line class="wire" x1="820" y1="236" x2="896" y2="236" marker-end="url(#ag1)"/>
+      <text class="elg" x="858" y="226" text-anchor="middle">on the map</text>
+      <text class="el" x="858" y="256" text-anchor="middle">(fig. 2)</text>
+    </svg>
+    </div>
+    <figcaption><b>Fig. 1 — One minute, one move.</b> Altitude and terrain are decided by different parts and meet in one target. Sensing reads the room and fills the reservoir; its level, passed through the ring thresholds, says how high the wall may go. The bandit draws one random sample from each arm's belief in the current occupancy band, adds the capped action lean, and the highest total names the world. An uncertain arm gives scattered samples and still gets tried; a proven arm gives tight high ones and wins more often. The router then plays the single clip that moves the wall from where it truly is toward that target.</figcaption>
+  </figure>
+
+  <!-- ================= FIG 2: the map ================= -->
+  <figure class="fig-mid">
+    <div class="fig-scroll">
+    <svg viewBox="0 0 680 622" role="img" aria-label="Radial map: eight arms as spokes from Barren at the hub, four concentric rings; the wall sits at node m2 and climbs one edge to m3, the clip named m2m3; holding a ring slides laterally along the ring circle.">
+      <defs>
+        <marker id="ag2" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><polygon points="0,0.5 8,4 0,7.5" fill="#4fe081"/></marker>
+        <marker id="am2" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><polygon points="0,0.5 8,4 0,7.5" fill="#8aa192"/></marker>
+      </defs>
+
+      <!-- rings -->
+      <circle cx="340" cy="342" r="64"  fill="none" stroke="#1f2d24" stroke-width="1.2"/>
+      <circle cx="340" cy="342" r="114" fill="none" stroke="#1f2d24" stroke-width="1.2"/>
+      <circle cx="340" cy="342" r="164" fill="none" stroke="#1f2d24" stroke-width="1.2"/>
+      <circle cx="340" cy="342" r="214" fill="none" stroke="#1f2d24" stroke-width="1.2"/>
+
+      <!-- spokes (climb / descend) -->
+      <line x1="340" y1="328" x2="340" y2="128"   stroke="#1f2d24" stroke-width="1.2"/>
+      <line x1="350" y1="332" x2="491" y2="191"   stroke="#1f2d24" stroke-width="1.2"/>
+      <line x1="354" y1="342" x2="554" y2="342"   stroke="#1f2d24" stroke-width="1.2"/>
+      <line x1="350" y1="352" x2="491" y2="493"   stroke="#1f2d24" stroke-width="1.2"/>
+      <line x1="340" y1="356" x2="340" y2="556"   stroke="#1f2d24" stroke-width="1.2"/>
+      <line x1="330" y1="352" x2="189" y2="493"   stroke="#1f2d24" stroke-width="1.2"/>
+      <line x1="326" y1="342" x2="126" y2="342"   stroke="#1f2d24" stroke-width="1.2"/>
+      <line x1="330" y1="332" x2="189" y2="191"   stroke="#1f2d24" stroke-width="1.2"/>
+
+      <!-- nodes: ring × arm -->
+      <g fill="#8aa192">
+        <circle cx="340" cy="342" r="5.5"/>
+        <!-- a (top) -->
+        <circle cx="340" cy="278" r="3.5"/><circle cx="340" cy="228" r="3.5"/><circle cx="340" cy="178" r="3.5"/><circle cx="340" cy="128" r="3.5"/>
+        <!-- u (45) -->
+        <circle cx="385.3" cy="296.7" r="3.5"/><circle cx="420.6" cy="261.4" r="3.5"/><circle cx="456" cy="226" r="3.5"/><circle cx="491.3" cy="190.7" r="3.5"/>
+        <!-- s (right) -->
+        <circle cx="404" cy="342" r="3.5"/><circle cx="454" cy="342" r="3.5"/><circle cx="504" cy="342" r="3.5"/><circle cx="554" cy="342" r="3.5"/>
+        <!-- r (315) -->
+        <circle cx="385.3" cy="387.3" r="3.5"/><circle cx="420.6" cy="422.6" r="3.5"/><circle cx="456" cy="458" r="3.5"/><circle cx="491.3" cy="493.3" r="3.5"/>
+        <!-- f (bottom) -->
+        <circle cx="340" cy="406" r="3.5"/><circle cx="340" cy="456" r="3.5"/><circle cx="340" cy="506" r="3.5"/><circle cx="340" cy="556" r="3.5"/>
+        <!-- h (225) -->
+        <circle cx="294.7" cy="387.3" r="3.5"/><circle cx="259.4" cy="422.6" r="3.5"/><circle cx="224" cy="458" r="3.5"/><circle cx="188.7" cy="493.3" r="3.5"/>
+        <!-- m (left) -->
+        <circle cx="276" cy="342" r="3.5"/><circle cx="176" cy="342" r="3.5"/><circle cx="126" cy="342" r="3.5"/>
+        <!-- c (135) -->
+        <circle cx="294.7" cy="296.7" r="3.5"/><circle cx="259.4" cy="261.4" r="3.5"/><circle cx="224" cy="226" r="3.5"/><circle cx="188.7" cy="190.7" r="3.5"/>
+      </g>
+
+      <!-- the example move: displayed m2, climb to m3 -->
+      <circle cx="226" cy="342" r="6.5" fill="#4fe081"/>
+      <text class="elg" x="238" y="322" text-anchor="start">displayed</text>
+      <circle cx="176" cy="342" r="10" fill="none" stroke="#4fe081" stroke-width="1.4" stroke-dasharray="3 3"/>
+      <circle cx="176" cy="342" r="3.5" fill="#4fe081"/>
+      <text class="elg" x="166" y="318" text-anchor="middle">target</text>
+      <line class="wire" x1="216" y1="342" x2="190" y2="342" marker-end="url(#ag2)"/>
+      <text class="elg" x="202" y="362" text-anchor="middle">m2m3</text>
+
+      <!-- the hold alternative: lateral m3 → h3 along ring 3 -->
+      <path class="wire-m" stroke-dasharray="4 4" d="M179,350 A164,164 0 0 0 221,452" marker-end="url(#am2)"/>
+      <text class="el" x="182" y="410" text-anchor="end">hold: m3h3</text>
+
+      <!-- ring labels along the top spoke -->
+      <g class="el">
+        <text x="347" y="276">R1</text>
+        <text x="347" y="226">R2</text>
+        <text x="347" y="176">R3</text>
+        <text x="347" y="126">R4</text>
+      </g>
+
+      <!-- arm labels -->
+      <g class="el">
+        <text x="340" y="100" text-anchor="middle">a · architecture</text>
+        <text x="514" y="172" text-anchor="start">u · furniture</text>
+        <text x="584" y="346" text-anchor="start">s · storm</text>
+        <text x="514" y="518" text-anchor="start">r · rivers</text>
+        <text x="340" y="598" text-anchor="middle">f · feast</text>
+        <text x="166" y="518" text-anchor="end">h · herd</text>
+        <text x="118" y="346" text-anchor="end">m · machinery</text>
+        <text x="166" y="172" text-anchor="end">c · cargo</text>
+        <text x="340" y="366" text-anchor="middle">b · Barren</text>
+      </g>
+    </svg>
+    </div>
+    <figcaption><b>Fig. 2 — The map the router walks.</b> Eight arms, four rings, Barren at the hub. Spokes are climb and descend clips, the circles are laterals between neighbouring arms, and every arm can collapse home to Barren. The wall occupies one node and each minute plays exactly one edge — here the climb whose file is named <b>m2m3</b>. No direct clip to the target means the first step of the shortest path. Holding a ring plays a loop (Ring 4 and Barren have them) or a lateral slide toward the runner-up arm; an empty room sends probes out of Barren.</figcaption>
+  </figure>
+
+  <!-- ================= FIG 3: the learning loop ================= -->
+  <figure class="fig-mid">
+    <div class="fig-scroll">
+    <svg viewBox="0 0 760 560" role="img" aria-label="Circular loop: beliefs feed the draw, the draw fires a clip on the wall, the wall plays to the room, sensing measures the change in cohesion, the change becomes a reward paid back into the beliefs; a daily personality seeds the beliefs at midnight.">
+      <defs>
+        <marker id="ag3" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><polygon points="0,0.5 8,4 0,7.5" fill="#4fe081"/></marker>
+        <marker id="aa3" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><polygon points="0,0.5 8,4 0,7.5" fill="#e2b45c"/></marker>
+        <marker id="am3" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><polygon points="0,0.5 8,4 0,7.5" fill="#8aa192"/></marker>
+      </defs>
+
+      <!-- edges, clockwise -->
+      <path class="wire"   d="M440,115 A195,195 0 0 1 510,155" marker-end="url(#ag3)"/>
+      <path class="wire"   d="M571,259 A195,195 0 0 1 571,341" marker-end="url(#ag3)"/>
+      <path class="wire"   d="M510,445 A195,195 0 0 1 440,485" marker-end="url(#ag3)"/>
+      <path class="wire"   d="M320,485 A195,195 0 0 1 249,445" marker-end="url(#ag3)"/>
+      <path class="wire-a" d="M189,341 A195,195 0 0 1 189,259" marker-end="url(#aa3)"/>
+      <path class="wire-a" d="M249,155 A195,195 0 0 1 320,115" marker-end="url(#aa3)"/>
+
+      <!-- edge labels -->
+      <text class="elg" x="500" y="96"  text-anchor="start">one draw each</text>
+      <text class="elg" x="618" y="296" text-anchor="start">clip fires ·</text>
+      <text class="elg" x="618" y="312" text-anchor="start">confirmed only</text>
+      <text class="elg" x="500" y="514" text-anchor="start">60 s of picture &amp; sound</text>
+      <text class="elg" x="260" y="514" text-anchor="end">behaviour</text>
+      <text class="ela" x="142" y="296" text-anchor="end">Δ cohesion</text>
+      <text class="ela" x="142" y="312" text-anchor="end">over the clip</text>
+      <text class="ela" x="260" y="88"  text-anchor="end">reward 0–1</text>
+      <text class="ela" x="260" y="104" text-anchor="end">±0.15 → 1 or 0</text>
+
+      <!-- the daily personality -->
+      <rect class="nbx" x="28" y="20" width="190" height="44" rx="7"/>
+      <text class="nt" x="123" y="47" text-anchor="middle" style="font-size:12.5px">PERSONALITY</text>
+      <path class="wire-m" d="M218,54 Q266,58 301,86" marker-end="url(#am3)"/>
+      <text class="el" x="30" y="84" text-anchor="start">priors at midnight</text>
+
+      <!-- nodes -->
+      <g>
+        <rect class="nbx" x="305" y="76" width="150" height="48" rx="24"/>
+        <text class="nt" x="380" y="96" text-anchor="middle">BELIEFS</text>
+        <text class="ns" x="380" y="113" text-anchor="middle">Beta per arm × band</text>
+
+        <rect class="nbx" x="474" y="179" width="150" height="48" rx="24"/>
+        <text class="nt" x="549" y="199" text-anchor="middle">DRAW</text>
+        <text class="ns" x="549" y="216" text-anchor="middle">Thompson + lean</text>
+
+        <rect class="nbx-hot" x="474" y="374" width="150" height="48" rx="24"/>
+        <text class="nt" x="549" y="394" text-anchor="middle">THE WALL</text>
+        <text class="ns" x="549" y="411" text-anchor="middle">Resolume plays</text>
+
+        <rect class="nbx-hot" x="305" y="476" width="150" height="48" rx="24"/>
+        <text class="nt" x="380" y="496" text-anchor="middle">THE ROOM</text>
+        <text class="ns" x="380" y="513" text-anchor="middle">the audience</text>
+
+        <rect class="nbx" x="136" y="374" width="150" height="48" rx="24"/>
+        <text class="nt" x="211" y="394" text-anchor="middle">SENSING</text>
+        <text class="ns" x="211" y="411" text-anchor="middle">cohesion, 1/s</text>
+
+        <rect class="nbx" x="136" y="179" width="150" height="48" rx="24" stroke="#e2b45c"/>
+        <text class="nt" x="211" y="199" text-anchor="middle">REWARD</text>
+        <text class="ns" x="211" y="216" text-anchor="middle">a fractional win</text>
+      </g>
+    </svg>
+    </div>
+    <figcaption><b>Fig. 3 — How it learns.</b> The slow loop. A confirmed clip plays for its minute, the room answers, sensing measures the change in smoothed cohesion from the clip's start to its end, and that change is paid into the exact belief the draw came from: a rise of 0.15 counts as a full win, a fall of 0.15 as a full loss, stasis as half. Arms that lift rooms like this one get drawn more often. At midnight the day's personality resets the beliefs to its own priors — Courtier, Operator, Accountant, Naif in rotation — and the day begins again.</figcaption>
+  </figure>
+
+  <div class="panel">
+    <h2>The honesty rules</h2>
+    <ul class="rules">
+      <li><span class="k">CONFIRM</span><span>Every fire is checked: the OSC send, then a REST read within 2 s. Only a confirmed fire advances the wall's recorded position or opens a reward window.</span></li>
+      <li><span class="k">HOLD</span><span>No confirmation: the position stands, nothing is earned, and the next minute routes again from the truth.</span></li>
+      <li><span class="k">BLIND</span><span>The crowd stream silent for 30 s: the controller stops trusting the room and walks the wall down its arm toward Barren until the data returns.</span></li>
+      <li><span class="k">MIDNIGHT</span><span>The personality changes, the beliefs reset to its priors, the action lean and any pending reward are cleared.</span></li>
+    </ul>
+  </div>
+
+  <div class="panel">
+    <h2>The numbers, as configured</h2>
+    <dl class="numbers">
+      <div><dt>clock</dt><dd>60 s per clip · audio leads by 5 s</dd></div>
+      <div><dt>occupancy bands</dt><dd>solo · 2–5 · 6–15 · 16+</dd></div>
+      <div><dt>ring up / down</dt><dd>0.2 / 0.4 / 0.6 / 0.8 · down 0.1 / 0.3 / 0.5 / 0.74</dd></div>
+      <div><dt>reservoir</dt><dd>rises 0.02/s · falls 0.01/s · never reset mid-day</dd></div>
+      <div><dt>reward map</dt><dd>Δ ±0.15 → 1 / 0 · no change → 0.5</dd></div>
+      <div><dt>action lean</dt><dd>cap ½ draw · half-life 90 s · warm-up 600 s</dd></div>
+      <div><dt>blind after</dt><dd>30 s without a crowd message</dd></div>
+      <div><dt>personalities</dt><dd>priors sized 2 / 6 / 12 / 1 · day-of-year mod 4</dd></div>
+    </dl>
+  </div>
+
+  <p class="foot">Drawn from the controller as it runs in the repository, November 2026. The lean mapping: sitting → Furniture, phone → Machinery, drinking → Rivers, eating → Feast.</p>
+</div>

@@ -15,7 +15,7 @@ Every person and every coding agent working on this repo reads these four files 
 3. `DECISIONS.md` — a dated log of every decision made so far. Append to it. Never edit old entries.
 4. `AGENTS.md` — the working rules for coding agents.
 
-For a plain-language description of every module there is `GUIDE.md`, and for running the installation and handling failures, `RUNBOOK.md`.
+For a plain-language description of every module there is `GUIDE.md`, and for running the installation and handling failures, `RUNBOOK.md`. The controller's decision mechanism is drawn in `docs/how_the_wall_chooses.html` — open it in any browser.
 
 ## Layout
 
