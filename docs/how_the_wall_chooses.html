@@ -93,12 +93,19 @@
     margin: 0 0 12px;
   }
   .rules { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
-  .rules li { display: grid; grid-template-columns: 96px 1fr; gap: 14px; font-size: 13.5px; color: var(--muted); }
-  .rules .k { font-family: var(--mono); font-weight: 600; font-size: 12px; color: var(--fg); letter-spacing: .06em; padding-top: 1px; }
+  .rules li { display: grid; grid-template-columns: 110px 1fr; gap: 14px; font-size: 13.5px; color: var(--muted); }
+  .rules .k { font-family: var(--mono); font-weight: 600; font-size: 12px; color: var(--fg); letter-spacing: .04em; padding-top: 1px; }
   dl.numbers { margin: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 14px 28px; }
   dl.numbers > div { display: grid; gap: 2px; min-width: 0; }
   dl.numbers dt { font-family: var(--mono); font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--green); }
-  dl.numbers dd { margin: 0; font-family: var(--mono); font-size: 12.5px; color: var(--fg); font-variant-numeric: tabular-nums; }
+  dl.numbers dd { margin: 0; font-size: 13.5px; color: var(--fg); font-variant-numeric: tabular-nums; }
+  .ptable-wrap { overflow-x: auto; margin-top: 22px; }
+  table.ptable { border-collapse: collapse; width: 100%; min-width: 420px; font-family: var(--mono); font-size: 12.5px; font-variant-numeric: tabular-nums; }
+  .ptable th, .ptable td { text-align: left; padding: 7px 14px 7px 0; border-bottom: 1px solid var(--line); vertical-align: bottom; }
+  .ptable th { font-size: 10.5px; font-weight: 500; letter-spacing: .1em; text-transform: uppercase; color: var(--green); }
+  .ptable td { color: var(--fg); }
+  .ptable td:first-child { font-weight: 600; }
+  .note { font-size: 13px; color: var(--muted); line-height: 1.6; margin: 12px 0 0; max-width: 74ch; }
   .foot { font-size: 12.5px; color: var(--muted); margin-top: 4px; }
   @media (max-width: 560px) {
     dl.numbers { grid-template-columns: 1fr; }
@@ -119,87 +126,87 @@
 </style>
 
 <div class="wrap">
-  <p class="eyebrow">Cockaigne · sensing → controller</p>
+  <p class="eyebrow">Cockaigne</p>
   <h1>How the Wall Chooses</h1>
-  <p class="intro">The controller's decision, in three drawings: how a minute's choice is assembled, the map that turns it into a clip name, and the loop that trains the beliefs.</p>
+  <p class="intro">Once a minute, the controller picks the next clip for the wall. This page shows how it makes that choice and how it learns from the audience during the day.</p>
 
-  <!-- ================= FIG 1: the minute's choice ================= -->
+  <!-- ================= FIG 1: choosing the next clip ================= -->
   <figure class="fig-wide">
     <div class="fig-scroll">
-    <svg viewBox="0 0 1080 462" role="img" aria-label="Flow diagram: the room feeds sensing, sensing fills the reservoir which sets the ring; beliefs feed a Thompson draw plus action lean which sets the arm; ring and arm meet in a target node, routed on the map into the next clip.">
+    <svg viewBox="0 0 1080 462" role="img" aria-label="Flow diagram. The room feeds sensing, which feeds the reservoir, whose level sets the ring. The estimates feed a random draw, plus a bonus for actions, which picks the arm. The ring and the arm give a target, and the clip map gives the next clip.">
       <defs>
         <marker id="ag1" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><polygon points="0,0.5 8,4 0,7.5" fill="#4fe081"/></marker>
         <marker id="am1" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><polygon points="0,0.5 8,4 0,7.5" fill="#8aa192"/></marker>
       </defs>
 
-      <text class="el" x="1060" y="38" text-anchor="end">cycle: every 60 s · audio leads by 5 s</text>
+      <text class="el" x="1060" y="38" text-anchor="end">once a minute · sound leads picture by 5 s</text>
 
-      <!-- top track: the room sets the altitude -->
+      <!-- top row: the room sets the ring -->
       <rect class="nbx-hot" x="20" y="96" width="140" height="64" rx="7"/>
       <text class="nt" x="90" y="124" text-anchor="middle">THE ROOM</text>
       <text class="ns" x="90" y="142" text-anchor="middle">people on the floor</text>
 
       <rect class="nbx" x="240" y="96" width="140" height="64" rx="7"/>
       <text class="nt" x="310" y="124" text-anchor="middle">SENSING</text>
-      <text class="ns" x="310" y="142" text-anchor="middle">cohesion blend</text>
+      <text class="ns" x="310" y="142" text-anchor="middle">scores cohesion</text>
 
       <rect class="nbx" x="460" y="96" width="140" height="64" rx="7"/>
       <text class="nt" x="530" y="124" text-anchor="middle">RESERVOIR</text>
       <text class="ns" x="530" y="142" text-anchor="middle">+0.02/s · −0.01/s</text>
 
       <line class="wire" x1="160" y1="128" x2="236" y2="128" marker-end="url(#ag1)"/>
-      <text class="elg" x="198" y="118" text-anchor="middle">tracks 10 Hz</text>
+      <text class="elg" x="198" y="118" text-anchor="middle">positions</text>
 
       <line class="wire" x1="380" y1="128" x2="456" y2="128" marker-end="url(#ag1)"/>
       <text class="elg" x="418" y="118" text-anchor="middle">score, 1/s</text>
 
-      <!-- bottom track: the bandit sets the terrain -->
+      <!-- bottom row: the controller sets the arm -->
       <rect class="nbx" x="240" y="312" width="140" height="64" rx="7"/>
-      <text class="nt" x="310" y="340" text-anchor="middle">BELIEFS</text>
-      <text class="ns" x="310" y="358" text-anchor="middle">8 arms × 4 bands</text>
+      <text class="nt" x="310" y="340" text-anchor="middle">ESTIMATES</text>
+      <text class="ns" x="310" y="358" text-anchor="middle">per arm, crowd size</text>
 
       <rect class="nbx" x="460" y="312" width="140" height="64" rx="7"/>
-      <text class="nt" x="530" y="340" text-anchor="middle">DRAW</text>
-      <text class="ns" x="530" y="358" text-anchor="middle">highest sample wins</text>
+      <text class="nt" x="530" y="340" text-anchor="middle">RANDOM DRAW</text>
+      <text class="ns" x="530" y="358" text-anchor="middle">highest number wins</text>
 
       <rect class="nbx" x="460" y="404" width="140" height="34" rx="7"/>
-      <text class="ns" x="530" y="425" text-anchor="middle">+ action lean ≤ ½ draw</text>
+      <text class="ns" x="530" y="425" text-anchor="middle">+ bonus for actions</text>
       <line class="wire-m" x1="530" y1="404" x2="530" y2="380" marker-end="url(#am1)"/>
 
       <line class="wire" x1="380" y1="344" x2="456" y2="344" marker-end="url(#ag1)"/>
-      <text class="elg" x="418" y="334" text-anchor="middle">a sample each</text>
+      <text class="elg" x="418" y="334" text-anchor="middle">one per arm</text>
 
-      <!-- the band link -->
+      <!-- crowd size picks which estimates are used -->
       <path class="wire-m" stroke-dasharray="4 4" d="M310,160 L310,248 L512,248 L512,308" marker-end="url(#am1)"/>
-      <text class="el" x="412" y="240" text-anchor="middle">n_smooth picks the band</text>
+      <text class="el" x="412" y="240" text-anchor="middle">crowd size</text>
 
-      <!-- convergence -->
+      <!-- the two meet -->
       <rect class="nbx" x="680" y="200" width="140" height="72" rx="7"/>
       <text class="nt" x="750" y="230" text-anchor="middle">TARGET</text>
       <text class="ns" x="750" y="248" text-anchor="middle">(arm, ring) · e.g. m3</text>
 
       <path class="wire" d="M600,128 L640,128 L640,226 L676,226" marker-end="url(#ag1)"/>
-      <text class="elg" x="648" y="182" text-anchor="start">ring_target 0–4</text>
+      <text class="elg" x="648" y="182" text-anchor="start">ring, 0–4</text>
 
       <path class="wire" d="M600,344 L640,344 L640,246 L676,246" marker-end="url(#ag1)"/>
-      <text class="elg" x="648" y="300" text-anchor="start">winning arm</text>
+      <text class="elg" x="648" y="300" text-anchor="start">arm</text>
 
       <rect class="nbx-hot" x="900" y="200" width="160" height="72" rx="7"/>
       <text class="nt" x="980" y="230" text-anchor="middle">NEXT CLIP</text>
-      <text class="ns" x="980" y="248" text-anchor="middle">e.g. m2m3 → fire</text>
+      <text class="ns" x="980" y="248" text-anchor="middle">e.g. m2m3 → Resolume</text>
 
       <line class="wire" x1="820" y1="236" x2="896" y2="236" marker-end="url(#ag1)"/>
       <text class="elg" x="858" y="226" text-anchor="middle">on the map</text>
-      <text class="el" x="858" y="256" text-anchor="middle">(fig. 2)</text>
+      <text class="el" x="858" y="256" text-anchor="middle">(figure 2)</text>
     </svg>
     </div>
-    <figcaption><b>Fig. 1 — One minute, one move.</b> Altitude and terrain are decided by different parts and meet in one target. Sensing reads the room and fills the reservoir; its level, passed through the ring thresholds, says how high the wall may go. The bandit draws one random sample from each arm's belief in the current occupancy band, adds the capped action lean, and the highest total names the world. An uncertain arm gives scattered samples and still gets tried; a proven arm gives tight high ones and wins more often. The router then plays the single clip that moves the wall from where it truly is toward that target.</figcaption>
+    <figcaption><b>Figure 1. Choosing the next clip.</b> The choice has two parts, made in different places. Sensing decides the ring. Once a second it scores how cohesive the room is, and the reservoir follows that score slowly. The reservoir's level sets the ring. One or two people can't raise the score high enough for ring 4. The controller decides the arm. For each arm it keeps an estimate of how well that arm has worked so far today with a crowd of the current size. Each estimate is a probability distribution, so the controller can draw a random number from it. It draws one number per arm, adds a bonus to some arms for what people are doing (people sitting favours Furniture, for example), and takes the highest. An arm with little history gives widely spread numbers, so it still wins sometimes. An arm with a good record gives consistently high numbers, so it wins more often. This method is called Thompson sampling. The ring and the arm give a target, and the controller plays the clip that moves the wall from where it is now towards that target.</figcaption>
   </figure>
 
-  <!-- ================= FIG 2: the map ================= -->
+  <!-- ================= FIG 2: the clip map ================= -->
   <figure class="fig-mid">
     <div class="fig-scroll">
-    <svg viewBox="0 0 680 622" role="img" aria-label="Radial map: eight arms as spokes from Barren at the hub, four concentric rings; the wall sits at node m2 and climbs one edge to m3, the clip named m2m3; holding a ring slides laterally along the ring circle.">
+    <svg viewBox="0 0 680 622" role="img" aria-label="Radial map. Eight arms run out from Barren at the centre, crossing four rings. The wall is at m2 and plays the clip m2m3 to reach its target, m3. A dashed arrow shows the sideways clip m3h3 it would play to stay on ring 3.">
       <defs>
         <marker id="ag2" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><polygon points="0,0.5 8,4 0,7.5" fill="#4fe081"/></marker>
         <marker id="am2" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><polygon points="0,0.5 8,4 0,7.5" fill="#8aa192"/></marker>
@@ -211,7 +218,7 @@
       <circle cx="340" cy="342" r="164" fill="none" stroke="#1f2d24" stroke-width="1.2"/>
       <circle cx="340" cy="342" r="214" fill="none" stroke="#1f2d24" stroke-width="1.2"/>
 
-      <!-- spokes (climb / descend) -->
+      <!-- spokes (up and down a ring) -->
       <line x1="340" y1="328" x2="340" y2="128"   stroke="#1f2d24" stroke-width="1.2"/>
       <line x1="350" y1="332" x2="491" y2="191"   stroke="#1f2d24" stroke-width="1.2"/>
       <line x1="354" y1="342" x2="554" y2="342"   stroke="#1f2d24" stroke-width="1.2"/>
@@ -221,7 +228,7 @@
       <line x1="326" y1="342" x2="126" y2="342"   stroke="#1f2d24" stroke-width="1.2"/>
       <line x1="330" y1="332" x2="189" y2="191"   stroke="#1f2d24" stroke-width="1.2"/>
 
-      <!-- nodes: ring × arm -->
+      <!-- positions: ring × arm -->
       <g fill="#8aa192">
         <circle cx="340" cy="342" r="5.5"/>
         <!-- a (top) -->
@@ -242,25 +249,25 @@
         <circle cx="294.7" cy="296.7" r="3.5"/><circle cx="259.4" cy="261.4" r="3.5"/><circle cx="224" cy="226" r="3.5"/><circle cx="188.7" cy="190.7" r="3.5"/>
       </g>
 
-      <!-- the example move: displayed m2, climb to m3 -->
+      <!-- the example move: the wall at m2, climbing to m3 -->
       <circle cx="226" cy="342" r="6.5" fill="#4fe081"/>
-      <text class="elg" x="238" y="322" text-anchor="start">displayed</text>
+      <text class="elg" x="238" y="322" text-anchor="start">on screen</text>
       <circle cx="176" cy="342" r="10" fill="none" stroke="#4fe081" stroke-width="1.4" stroke-dasharray="3 3"/>
       <circle cx="176" cy="342" r="3.5" fill="#4fe081"/>
       <text class="elg" x="166" y="318" text-anchor="middle">target</text>
       <line class="wire" x1="216" y1="342" x2="190" y2="342" marker-end="url(#ag2)"/>
       <text class="elg" x="202" y="362" text-anchor="middle">m2m3</text>
 
-      <!-- the hold alternative: lateral m3 → h3 along ring 3 -->
+      <!-- staying on ring 3: sideways from m3 to h3 -->
       <path class="wire-m" stroke-dasharray="4 4" d="M179,350 A164,164 0 0 0 221,452" marker-end="url(#am2)"/>
-      <text class="el" x="182" y="410" text-anchor="end">hold: m3h3</text>
+      <text class="el" x="182" y="410" text-anchor="end">to stay on ring 3: m3h3</text>
 
       <!-- ring labels along the top spoke -->
       <g class="el">
-        <text x="347" y="276">R1</text>
-        <text x="347" y="226">R2</text>
-        <text x="347" y="176">R3</text>
-        <text x="347" y="126">R4</text>
+        <text x="347" y="272">ring 1</text>
+        <text x="347" y="222">ring 2</text>
+        <text x="347" y="172">ring 3</text>
+        <text x="347" y="122">ring 4</text>
       </g>
 
       <!-- arm labels -->
@@ -277,13 +284,13 @@
       </g>
     </svg>
     </div>
-    <figcaption><b>Fig. 2 — The map the router walks.</b> Eight arms, four rings, Barren at the hub. Spokes are climb and descend clips, the circles are laterals between neighbouring arms, and every arm can collapse home to Barren. The wall occupies one node and each minute plays exactly one edge — here the climb whose file is named <b>m2m3</b>. No direct clip to the target means the first step of the shortest path. Holding a ring plays a loop (Ring 4 and Barren have them) or a lateral slide toward the runner-up arm; an empty room sends probes out of Barren.</figcaption>
+    <figcaption><b>Figure 2. The clip map.</b> Each dot is a position the wall can be in. There are eight arms with four rings each, and Barren in the centre. Each clip moves the wall along one line. Clips along a spoke go up or down a ring. Clips around a circle move to another arm on the same ring. Every arm can also drop straight back to Barren from rings 1, 2 and 3. A clip is named by where it starts and where it ends, so m2m3 runs from Machinery ring 2 to Machinery ring 3. Here the wall is at m2 and the target is m3, so it plays m2m3. If no single clip reaches the target, the wall takes the first step of the shortest route. If the wall is already at the target, it plays a loop clip where there is one (every arm has one at ring 4, and Barren may have one). Otherwise it moves sideways to the arm that came second in the draw, staying on the same ring. In Barren without a loop clip, it goes out to ring 1 and comes back.</figcaption>
   </figure>
 
-  <!-- ================= FIG 3: the learning loop ================= -->
+  <!-- ================= FIG 3: how it learns ================= -->
   <figure class="fig-mid">
     <div class="fig-scroll">
-    <svg viewBox="0 0 760 560" role="img" aria-label="Circular loop: beliefs feed the draw, the draw fires a clip on the wall, the wall plays to the room, sensing measures the change in cohesion, the change becomes a reward paid back into the beliefs; a daily personality seeds the beliefs at midnight.">
+    <svg viewBox="0 0 760 560" role="img" aria-label="Loop diagram. The estimates feed a random draw, which plays a clip on the wall. The room responds, sensing measures the change in cohesion, and the score updates the estimates. The daily personality resets the estimates at midnight.">
       <defs>
         <marker id="ag3" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><polygon points="0,0.5 8,4 0,7.5" fill="#4fe081"/></marker>
         <marker id="aa3" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><polygon points="0,0.5 8,4 0,7.5" fill="#e2b45c"/></marker>
@@ -299,31 +306,30 @@
       <path class="wire-a" d="M249,155 A195,195 0 0 1 320,115" marker-end="url(#aa3)"/>
 
       <!-- edge labels -->
-      <text class="elg" x="500" y="96"  text-anchor="start">one draw each</text>
-      <text class="elg" x="618" y="296" text-anchor="start">clip fires ·</text>
-      <text class="elg" x="618" y="312" text-anchor="start">confirmed only</text>
-      <text class="elg" x="500" y="514" text-anchor="start">60 s of picture &amp; sound</text>
-      <text class="elg" x="260" y="514" text-anchor="end">behaviour</text>
-      <text class="ela" x="142" y="296" text-anchor="end">Δ cohesion</text>
+      <text class="elg" x="500" y="96"  text-anchor="start">one draw per arm</text>
+      <text class="elg" x="618" y="296" text-anchor="start">clip plays</text>
+      <text class="elg" x="618" y="312" text-anchor="start">once confirmed</text>
+      <text class="elg" x="500" y="514" text-anchor="start">a minute of picture and sound</text>
+      <text class="elg" x="260" y="514" text-anchor="end">what people do</text>
+      <text class="ela" x="142" y="296" text-anchor="end">cohesion change</text>
       <text class="ela" x="142" y="312" text-anchor="end">over the clip</text>
-      <text class="ela" x="260" y="88"  text-anchor="end">reward 0–1</text>
-      <text class="ela" x="260" y="104" text-anchor="end">±0.15 → 1 or 0</text>
+      <text class="ela" x="260" y="96"  text-anchor="end">updates the estimate</text>
 
       <!-- the daily personality -->
       <rect class="nbx" x="28" y="20" width="190" height="44" rx="7"/>
-      <text class="nt" x="123" y="47" text-anchor="middle" style="font-size:12.5px">PERSONALITY</text>
+      <text class="nt" x="123" y="47" text-anchor="middle" style="font-size:12.5px">DAILY PERSONALITY</text>
       <path class="wire-m" d="M218,54 Q266,58 301,86" marker-end="url(#am3)"/>
-      <text class="el" x="30" y="84" text-anchor="start">priors at midnight</text>
+      <text class="el" x="226" y="40" text-anchor="start">resets them at midnight</text>
 
       <!-- nodes -->
       <g>
         <rect class="nbx" x="305" y="76" width="150" height="48" rx="24"/>
-        <text class="nt" x="380" y="96" text-anchor="middle">BELIEFS</text>
-        <text class="ns" x="380" y="113" text-anchor="middle">Beta per arm × band</text>
+        <text class="nt" x="380" y="96" text-anchor="middle">ESTIMATES</text>
+        <text class="ns" x="380" y="113" text-anchor="middle">per arm, crowd size</text>
 
         <rect class="nbx" x="474" y="179" width="150" height="48" rx="24"/>
-        <text class="nt" x="549" y="199" text-anchor="middle">DRAW</text>
-        <text class="ns" x="549" y="216" text-anchor="middle">Thompson + lean</text>
+        <text class="nt" x="549" y="199" text-anchor="middle">RANDOM DRAW</text>
+        <text class="ns" x="549" y="216" text-anchor="middle">highest wins</text>
 
         <rect class="nbx-hot" x="474" y="374" width="150" height="48" rx="24"/>
         <text class="nt" x="549" y="394" text-anchor="middle">THE WALL</text>
@@ -335,40 +341,55 @@
 
         <rect class="nbx" x="136" y="374" width="150" height="48" rx="24"/>
         <text class="nt" x="211" y="394" text-anchor="middle">SENSING</text>
-        <text class="ns" x="211" y="411" text-anchor="middle">cohesion, 1/s</text>
+        <text class="ns" x="211" y="411" text-anchor="middle">measures cohesion</text>
 
         <rect class="nbx" x="136" y="179" width="150" height="48" rx="24" stroke="#e2b45c"/>
-        <text class="nt" x="211" y="199" text-anchor="middle">REWARD</text>
-        <text class="ns" x="211" y="216" text-anchor="middle">a fractional win</text>
+        <text class="nt" x="211" y="199" text-anchor="middle">SCORE</text>
+        <text class="ns" x="211" y="216" text-anchor="middle">0 to 1</text>
       </g>
     </svg>
     </div>
-    <figcaption><b>Fig. 3 — How it learns.</b> The slow loop. A confirmed clip plays for its minute, the room answers, sensing measures the change in smoothed cohesion from the clip's start to its end, and that change is paid into the exact belief the draw came from: a rise of 0.15 counts as a full win, a fall of 0.15 as a full loss, stasis as half. Arms that lift rooms like this one get drawn more often. At midnight the day's personality resets the beliefs to its own priors — Courtier, Operator, Accountant, Naif in rotation — and the day begins again.</figcaption>
+    <figcaption><b>Figure 3. How the controller learns.</b> Each confirmed clip is scored when the next one starts. The controller compares the room's cohesion at that moment with its cohesion a few seconds after the clip began. How many seconds depends on the day's personality, from 8 to 20. A large enough rise scores 1, the same size of fall scores 0, and no change scores 0.5. The size that counts also depends on the personality, from 0.08 to 0.20. Clips that end in Barren are not scored. The score updates the estimate for the arm that was played, at the crowd size it was played to. Over the day, arms that tend to raise cohesion get chosen more often, separately for each crowd size. At midnight the estimates go back to the starting values of the next day's personality.</figcaption>
   </figure>
 
   <div class="panel">
-    <h2>The honesty rules</h2>
+    <h2>Safeguards</h2>
     <ul class="rules">
-      <li><span class="k">CONFIRM</span><span>Every fire is checked: the OSC send, then a REST read within 2 s. Only a confirmed fire advances the wall's recorded position or opens a reward window.</span></li>
-      <li><span class="k">HOLD</span><span>No confirmation: the position stands, nothing is earned, and the next minute routes again from the truth.</span></li>
-      <li><span class="k">BLIND</span><span>The crowd stream silent for 30 s: the controller stops trusting the room and walks the wall down its arm toward Barren until the data returns.</span></li>
-      <li><span class="k">MIDNIGHT</span><span>The personality changes, the beliefs reset to its priors, the action lean and any pending reward are cleared.</span></li>
+      <li><span class="k">Confirmation</span><span>After sending a clip, the controller checks with Resolume that it is playing, allowing 2 seconds. If a different clip is playing, it sends the clip once more. If Resolume can't be reached to check, the controller assumes the clip is playing.</span></li>
+      <li><span class="k">Failed clip</span><span>If the clip still isn't confirmed, the controller keeps its record of the wall where it was and doesn't score the clip. The next minute's move is planned from that position.</span></li>
+      <li><span class="k">Lost data</span><span>If no new crowd data arrives for 30 seconds, the controller stops following the room. It moves the wall down one ring per clip along its current arm until it reaches Barren or the data comes back.</span></li>
+      <li><span class="k">Midnight</span><span>The personality changes and the estimates return to its starting values. The action bonus is cleared, and the clip playing at midnight is not scored.</span></li>
     </ul>
   </div>
 
   <div class="panel">
-    <h2>The numbers, as configured</h2>
+    <h2>Current settings</h2>
     <dl class="numbers">
-      <div><dt>clock</dt><dd>60 s per clip · audio leads by 5 s</dd></div>
-      <div><dt>occupancy bands</dt><dd>solo · 2–5 · 6–15 · 16+</dd></div>
-      <div><dt>ring up / down</dt><dd>0.2 / 0.4 / 0.6 / 0.8 · down 0.1 / 0.3 / 0.5 / 0.74</dd></div>
-      <div><dt>reservoir</dt><dd>rises 0.02/s · falls 0.01/s · never reset mid-day</dd></div>
-      <div><dt>reward map</dt><dd>Δ ±0.15 → 1 / 0 · no change → 0.5</dd></div>
-      <div><dt>action lean</dt><dd>cap ½ draw · half-life 90 s · warm-up 600 s</dd></div>
-      <div><dt>blind after</dt><dd>30 s without a crowd message</dd></div>
-      <div><dt>personalities</dt><dd>priors sized 2 / 6 / 12 / 1 · day-of-year mod 4</dd></div>
+      <div><dt>Clip length</dt><dd>60 s. Sound for the next clip starts 5 s before its picture.</dd></div>
+      <div><dt>Crowd sizes</dt><dd>1 · 2–5 · 6–15 · 16 or more, from the smoothed headcount.</dd></div>
+      <div><dt>Rings</dt><dd>Up at 0.2, 0.4, 0.6, 0.8. Down below 0.1, 0.3, 0.5, 0.74.</dd></div>
+      <div><dt>Reservoir</dt><dd>Rises up to 0.02 a second and falls up to 0.01 a second. Never reset while sensing runs.</dd></div>
+      <div><dt>Score ceiling</dt><dd>0.72 for one or two people, under ring 4's 0.8.</dd></div>
+      <div><dt>Action bonus</dt><dd>Sitting → Furniture, phone → Machinery, drinking → Rivers, eating → Feast. At most 0.5, half-life 90 s, off for the first 10 minutes after start-up.</dd></div>
+      <div><dt>Lost data</dt><dd>30 s without new crowd data.</dd></div>
+      <div><dt>Personalities</dt><dd>One per day in turn, by day of the year. Values below.</dd></div>
     </dl>
+
+    <div class="ptable-wrap">
+      <table class="ptable">
+        <thead>
+          <tr><th>Personality</th><th>Prior strength</th><th>Storm starts at</th><th>Full marks at</th><th>Waits</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Courtier</td><td>2</td><td>0.30</td><td>+0.10</td><td>10 s</td></tr>
+          <tr><td>Operator</td><td>6</td><td>0.50</td><td>+0.15</td><td>15 s</td></tr>
+          <tr><td>Accountant</td><td>12</td><td>0.35</td><td>+0.20</td><td>20 s</td></tr>
+          <tr><td>Naif</td><td>1</td><td>0.65</td><td>+0.08</td><td>8 s</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="note">Prior strength is how many imaginary results each estimate starts the day with. A low number means the controller changes its mind quickly. Every arm except Storm starts at 0.5. Full marks is the rise in cohesion that scores 1. Waits is how far into a clip the measurement starts.</p>
   </div>
 
-  <p class="foot">Drawn from the controller as it runs in the repository, November 2026. The lean mapping: sitting → Furniture, phone → Machinery, drinking → Rivers, eating → Feast.</p>
+  <p class="foot">Drawn from the controller code and from config/controller.yaml and config/sensing.yaml, November 2026. If those change, this page needs updating.</p>
 </div>
