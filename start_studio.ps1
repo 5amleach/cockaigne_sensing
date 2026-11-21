@@ -14,7 +14,11 @@ param([switch]$Stop, [switch]$NoWall)
 $repo        = $PSScriptRoot
 $python      = Join-Path $repo ".venv\Scripts\python.exe"
 $config      = "config/studio.yaml"
+# Resolume Avenue is used when it is installed, otherwise Arena. The controller speaks to either the same way.
+$avenue      = "C:\Program Files\Resolume Avenue\Avenue.exe"
 $arena       = "C:\Program Files\Resolume Arena\Arena.exe"
+if (Test-Path $avenue) { $arena = $avenue }
+$resolume    = [IO.Path]::GetFileNameWithoutExtension($arena)   # "Avenue" or "Arena", the process name
 $composition = Join-Path ([Environment]::GetFolderPath("MyDocuments")) "Resolume Arena\Compositions\cockaigne_studio.avc"
 $edge        = "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
 $wallSpot    = "1.75,3.5"   # the viewing spot in config/studio.yaml, drawn on the wall's floor plan
@@ -78,10 +82,10 @@ if (-not (Test-Path (Join-Path $repo "camera_password.txt")) -and -not $env:COCK
 }
 
 # 2. Resolume, with the Cockaigne composition loaded.
-if (-not (Get-Process Arena -ErrorAction SilentlyContinue)) {
-    if (-not (Test-Path $arena))       { Fail "Resolume Arena is missing at $arena" }
+if (-not (Get-Process Avenue, Arena -ErrorAction SilentlyContinue)) {
+    if (-not (Test-Path $arena))       { Fail "Resolume is missing at $arena" }
     if (-not (Test-Path $composition)) { Fail "The composition is missing at $composition" }
-    Say "Starting Resolume with cockaigne_studio ..."
+    Say "Starting Resolume $resolume with cockaigne_studio ..."
     Start-Process $arena -ArgumentList "`"$composition`"" -WorkingDirectory (Split-Path $arena)
 } else {
     Say "Resolume is already running."
