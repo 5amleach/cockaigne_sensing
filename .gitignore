@@ -11,6 +11,8 @@ bench/out/
 # scripted-session stills are pictures of people; they stay on the machine
 bench/sessions/
 bench/*/snap_*.jpg
+# the data wall's own Edge profile, made by start_studio.ps1
+.edge-wall/
 __pycache__/
 *.egg-info/
 .pytest_cache/

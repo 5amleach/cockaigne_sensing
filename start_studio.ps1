@@ -3,7 +3,7 @@
 #
 # A desktop shortcut runs this file. Running it again restarts the sensing
 # chain and the controller cleanly, and leaves Resolume as it is.
-#   -Stop     closes the sensing chain and the controller, and nothing else.
+#   -Stop     closes the sensing chain, the controller and the data wall, and nothing else.
 #   -Stop -All  closes Resolume as well, which takes its full-screen picture
 #             off the monitors. The Cockaigne STOP shortcut does this, and its
 #             key (Ctrl+Alt+S) works even when the picture covers the desktop.
@@ -30,6 +30,9 @@ $composition = "Resolume Avenue", "Resolume Arena" |
     Where-Object { Test-Path $_ } | Select-Object -First 1
 $edge        = "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
 $wallSpot    = "1.75,3.5"   # the viewing spot in config/studio.yaml, drawn on the wall's floor plan
+# The data wall's Edge keeps its own profile here, so it is a separate Edge from
+# Sam's own and can be placed, and closed, without touching Sam's own windows.
+$wallProfile = Join-Path $repo ".edge-wall"
 $restUrl     = "http://127.0.0.1:8080/api/v1/composition"
 $minClips    = 100          # layer 1 holds 288 clips; fewer than this means the composition is still loading
 
@@ -65,6 +68,31 @@ function Clips-Loaded {
     } catch { return -1 }
 }
 
+function Stop-Wall {
+    # Only the Edge that uses the data wall's own profile folder is closed.
+    $wall = Get-CimInstance Win32_Process -Filter "Name = 'msedge.exe'" |
+        Where-Object { $_.CommandLine -like "*$wallProfile*" }
+    foreach ($p in $wall) { Stop-Process -Id $p.ProcessId -Force -ErrorAction SilentlyContinue }
+    if ($wall) { Start-Sleep -Seconds 1 }
+}
+
+function Open-Wall($url) {
+    # The data screen is the one that is not the widest; the widest is the landscape.
+    # With one screen the wall opens as an ordinary window, as before.
+    Add-Type -AssemblyName System.Windows.Forms
+    $screens = [System.Windows.Forms.Screen]::AllScreens | Sort-Object { $_.Bounds.Width } -Descending
+    $edgeArgs = "--user-data-dir=`"$wallProfile`"", "--no-first-run"
+    if (@($screens).Count -gt 1) {
+        # Kiosk mode is full screen with no bars, on the screen the window starts on.
+        $b = $screens[1].Bounds
+        $edgeArgs += "--window-position=$($b.X),$($b.Y)", "--kiosk", $url, "--edge-kiosk-type=fullscreen"
+    } else {
+        $edgeArgs += "--new-window", $url
+    }
+    Start-Process $edge -ArgumentList $edgeArgs
+    return @($screens).Count -gt 1
+}
+
 function Start-Window($title, $module, $arguments) {
     $line = "title $title & `"$python`" -m $module $arguments"
     Start-Process cmd.exe -ArgumentList "/k", $line -WorkingDirectory $repo
@@ -75,11 +103,12 @@ Set-Location $repo
 
 if ($Stop) {
     $n = Stop-Ours
+    Stop-Wall
     if ($All) {
         Get-Process Avenue, Arena -ErrorAction SilentlyContinue | Stop-Process -Force
-        Say "Stopped the sensing chain, the controller ($n processes) and Resolume." "Green"
+        Say "Stopped the sensing chain, the controller ($n processes), the data wall and Resolume." "Green"
     } else {
-        Say "Stopped the sensing chain and the controller ($n processes). Resolume is untouched." "Green"
+        Say "Stopped the sensing chain, the controller ($n processes) and the data wall. Resolume is untouched." "Green"
     }
     Start-Sleep -Seconds 3
     exit 0
@@ -131,9 +160,10 @@ Start-Sleep -Seconds 4
 # 5. The data wall.
 if (-not $NoWall) {
     $wall = "file:///" + ((Join-Path $repo "datawall\index.html") -replace "\\", "/" -replace " ", "%20") + "?spot=$wallSpot"
-    if (Test-Path $edge) { Start-Process $edge -ArgumentList "--new-window", $wall }
-    else { Start-Process $wall }
-    Say "Data wall opened. Press F11 in it for full screen."
+    Stop-Wall   # a second double-click replaces the wall rather than adding one
+    if (-not (Test-Path $edge)) { Start-Process $wall; Say "Data wall opened. Press F11 in it for full screen." }
+    elseif (Open-Wall $wall) { Say "Data wall opened full screen on the data screen." }
+    else { Say "Data wall opened. There is one screen, so press F11 in it for full screen." }
 }
 
 Say ""
