@@ -148,3 +148,7 @@ A reset puts the camera back on US Pacific time. When the zone is changed, the c
 ## 21 Nov 2026: full-size pictures for Experiment 29
 
 Sam compared the small working copy of u3u4 with the two full-size versions on the two Dells and found both full-size versions much better. All 288 masters exist as GIMM then Proteus, 25 fps, so Experiment 29 plays those. They stay where they are on C: and D:; `load_pictures` points a copy of the composition (`cockaigne_e29_full`) at them by clip name, and `cockaigne_e29` with the small copies is kept as the fallback. `start_studio.ps1 -Composition <name>` chooses between them.
+
+## 21 Nov 2026: the data wall's Edge runs signed out, with no extensions (Claude Code)
+
+The data screen sometimes showed a ChatGPT login page. Cause: Edge signed the wall's new profile (`.edge-wall`) in to Sam's Microsoft account by itself and synced his extensions into it; on install the ChatGPT extension opens `chatgpt.com/work/extension/installed`, which lands on the login page and covers the kiosk window. Reproduced with a fresh profile and the old command line. `start_studio.ps1` now starts the wall's Edge with `--disable-extensions --disable-sync --disable-features=msImplicitSignin --no-default-browser-check --disable-session-crashed-bubble --hide-crash-restore-bubble`. The signed-in profile was moved out of the repo, so the next start makes a clean one. Eight test launches, with Sam's Edge in the background, with a window open and closed, and after normal closes and forced kills, all showed only the wall page on the projector.

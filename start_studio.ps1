@@ -84,7 +84,12 @@ function Open-Wall($url) {
     # With one screen the wall opens as an ordinary window, as before.
     Add-Type -AssemblyName System.Windows.Forms
     $screens = [System.Windows.Forms.Screen]::AllScreens | Sort-Object { $_.Bounds.Width } -Descending
-    $edgeArgs = "--user-data-dir=`"$wallProfile`"", "--no-first-run"
+    # A new profile signed itself in to Sam's Microsoft account and synced his
+    # extensions; the ChatGPT one then opened its login page over the wall.
+    # These flags keep the wall signed out, with no extensions, sync or restore.
+    $edgeArgs = "--user-data-dir=`"$wallProfile`"", "--no-first-run", "--no-default-browser-check",
+        "--disable-extensions", "--disable-sync", "--disable-features=msImplicitSignin",
+        "--disable-session-crashed-bubble", "--hide-crash-restore-bubble"
     if (@($screens).Count -gt 1) {
         # Kiosk mode is full screen with no bars, on the screen the window starts on.
         $b = $screens[1].Bounds
