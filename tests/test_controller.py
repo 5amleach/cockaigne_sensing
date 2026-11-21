@@ -361,3 +361,15 @@ def test_the_real_pool_of_288_names_passes_missing():
     assert cmap.missing() == []
     assert cmap.loops == {}         # the real pool has no loop clips
     assert len(cmap.moves) == 288   # every name parsed, none collided
+
+
+def test_full_size_pictures_are_found_across_two_folders(tmp_path):
+    from cockaigne_controller.load_sounds import find_sounds
+    for rel in ("c/herd/h2h3_GIMM_25_raw_prob4.mov", "d/level 2/a2f2_GIMM_25_raw_prob4.mov",
+                "c/kit/h2h3_GIMM_25_raw_prob4_6048x882.mov", "d/a2f2.mp4"):
+        (tmp_path / rel).parent.mkdir(parents=True, exist_ok=True)
+        (tmp_path / rel).write_bytes(b"")
+    found, complaints = find_sounds([str(tmp_path / "c"), str(tmp_path / "d")],
+                                    "^([a-z][0-9][a-z][0-9])_", {}, "*_GIMM_25_raw_prob4.mov")
+    assert set(found) == {"h2h3", "a2f2"} and not complaints   # resized copies and small clips are passed over
+

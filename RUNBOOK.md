@@ -85,6 +85,17 @@ python -m cockaigne_controller.load_sounds               (loads them; then save 
 
 The folder it reads and the two sound layers are in `config/controller.yaml`. The picture layer must sit at zero transition, and the sound layers need nothing else set.
 
+## Full-size pictures
+
+The show composition `cockaigne_e29` plays small copies of the clips. `cockaigne_e29_full` is the same composition with every slot pointed at its full-size master (8064 x 1176 ProRes, on two drives). It was made by opening a copy of the show composition in Resolume and running:
+
+```
+python -m cockaigne_controller.load_pictures --dry-run   (lists clips without a full-size file, changes nothing)
+python -m cockaigne_controller.load_pictures             (loads them; then save the composition in Resolume)
+```
+
+The folders it searches are in `config/controller.yaml` under `picture`. A clip with no full-size file keeps its small copy. START opens the composition named at the top of `start_studio.ps1` (`$compositionName`); to start the other one once, run `start_studio.ps1 -Composition cockaigne_e29`. The drive holding the level 2 masters (D:) must be plugged in.
+
 ## What failure looks like, and what to do
 
 **The picture plays but there is no sound.** Look at layers 2 and 3 in Resolume: each should show a sound starting six seconds before every picture change. If the layers are empty, the composition was saved without its sounds; run `load_sounds` again. If sounds start but nothing is heard, check the layer volumes, the composition's master volume and the audio output in Resolume's preferences.

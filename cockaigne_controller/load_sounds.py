@@ -22,13 +22,16 @@ from .config import load
 from .resolume import layout_from_composition
 
 
-def find_sounds(folder: str, name_pattern: str, renames: dict) -> tuple[dict, list]:
-    """Clip name -> sound file, from the file names under `folder`. A path
-    ending listed in `renames` takes the clip name given there. Returns the
-    map and a list of complaints (two files for one clip, unreadable names)."""
+def find_sounds(folder: str | list, name_pattern: str, renames: dict,
+                glob: str = "*.wav") -> tuple[dict, list]:
+    """Clip name -> file, from the file names under `folder` (one folder or a
+    list of them). A path ending listed in `renames` takes the clip name given
+    there. Returns the map and a list of complaints (two files for one clip,
+    unreadable names). load_pictures uses it too, with another `glob`."""
     found: dict[str, Path] = {}
     complaints: list[str] = []
-    for path in sorted(Path(folder).rglob("*.wav")):
+    folders = [folder] if isinstance(folder, str) else folder
+    for path in sorted(p for f in folders for p in Path(f).rglob(glob)):
         tail = next((clip for ending, clip in renames.items()
                      if path.as_posix().lower().endswith(ending.lower())), None)
         match = re.search(name_pattern, path.name.lower())

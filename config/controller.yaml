@@ -75,3 +75,13 @@ sound:
     "level 3 herd/level 3_f3u3_au.wav": h3a3      # to be confirmed by Karl
     "level 4 machine/level 4_h4u4_au.wav": m4a4   # to be confirmed by Karl
   play_mode: "Play Once & Clear"       # a sound plays through once and frees its layer
+
+picture:
+  # Read only by `python -m cockaigne_controller.load_pictures`, which points each clip
+  # slot at its full-size file. Run it once, on a copy of the show composition.
+  folders:                             # searched with their subfolders
+    - C:/cockaigne wall masters/gimm25_then_proteus
+    - D:/cockaigne wall masters
+  glob: "*_GIMM_25_raw_prob4.mov"      # which files count as full-size masters
+  name_pattern: "^([a-z][0-9][a-z][0-9])_"     # the clip name starts the file name
+  resize: Fit                          # the whole picture, in proportion, inside the composition
