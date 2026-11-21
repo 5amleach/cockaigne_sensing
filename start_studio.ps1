@@ -13,7 +13,7 @@
 # Each of the two programs gets its own window, titled "Cockaigne sensing" and
 # "Cockaigne controller". The windows stay open if a program stops, so its
 # last words can be read. See RUNBOOK.md, "The studio shed, one double-click".
-param([switch]$Stop, [switch]$All, [switch]$NoWall, [string]$Composition = "cockaigne_e29")
+param([switch]$Stop, [switch]$All, [switch]$NoWall, [string]$Composition = "cockaigne_e29_full")
 
 $repo        = $PSScriptRoot
 $python      = Join-Path $repo ".venv\Scripts\python.exe"
@@ -25,7 +25,7 @@ if (Test-Path $avenue) { $arena = $avenue }
 $resolume    = [IO.Path]::GetFileNameWithoutExtension($arena)   # "Avenue" or "Arena", the process name
 # The composition with the sounds loaded (RUNBOOK.md, "Sound"), wherever Resolume saved it.
 # cockaigne_e29 plays the small clips; cockaigne_e29_full plays the full-size masters
-# (RUNBOOK.md, "Full-size pictures"). Change the default in the param line above to switch.
+# (RUNBOOK.md, "Full-size pictures"), and is the usual one. The param line above names it.
 $compositionName = $Composition
 $documents   = [Environment]::GetFolderPath("MyDocuments")
 $composition = "Resolume Avenue", "Resolume Arena" |

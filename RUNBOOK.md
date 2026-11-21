@@ -94,7 +94,7 @@ python -m cockaigne_controller.load_pictures --dry-run   (lists clips without a 
 python -m cockaigne_controller.load_pictures             (loads them; then save the composition in Resolume)
 ```
 
-The folders it searches are in `config/controller.yaml` under `picture`. A clip with no full-size file keeps its small copy. START opens the composition named at the top of `start_studio.ps1` (`$compositionName`); to start the other one once, run `start_studio.ps1 -Composition cockaigne_e29`. The drive holding the level 2 masters (D:) must be plugged in.
+The folders it searches are in `config/controller.yaml` under `picture`. A clip with no full-size file keeps its small copy. START opens the composition named at the top of `start_studio.ps1` (`$compositionName`); START opens `cockaigne_e29_full`. To fall back to the small copies, run `start_studio.ps1 -Composition cockaigne_e29`, or change the name in the param line. The drive holding the level 2 masters (D:) must be plugged in.
 
 ## What failure looks like, and what to do
 
