@@ -1,8 +1,8 @@
-"""Talks to Resolume: read the composition, fire a clip, set a volume.
+"""Talks to Resolume: read the composition, fire a clip.
 
 The composition (which clip sits where) is read once at start-up over
-Resolume's REST API; no clip index is ever typed by hand. Clips are fired
-and volumes set over OSC on UDP. The controller never asks Resolume where
+Resolume's REST API; no clip index is ever typed by hand. Clips, picture
+and sound alike, are fired over OSC on UDP. The controller never asks Resolume where
 the playhead is: it owns the clock. Both ports are on the local machine.
 """
 from __future__ import annotations
@@ -71,14 +71,6 @@ class Resolume:
         """Send the connect message. Never raises; says whether it was sent."""
         try:
             self._osc.send_message(f"/composition/layers/{layer}/clips/{index}/connect", 1)
-            return True
-        except Exception:
-            return False
-
-    def set_volume(self, layer: int, volume: float) -> bool:
-        """Send a volume change. Never raises; says whether it was sent."""
-        try:
-            self._osc.send_message(f"/composition/layers/{layer}/audio/volume", float(volume))
             return True
         except Exception:
             return False

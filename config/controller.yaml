@@ -9,8 +9,8 @@ resolume:
   osc_port: 7000      # clips are fired over OSC on UDP
   rest_port: 8080     # the composition (the clip names) is read over REST at start-up
   video_layer: 1      # the layer holding the landscape clips
-  audio_bank_a: [2, 3, 4, 5]   # four stem layers, bank A
-  audio_bank_b: [6, 7, 8, 9]   # four stem layers, bank B; two banks so an arm change can crossfade
+  sound_layers: [2, 3]  # two layers that take turns playing each clip's sound, so one sound can
+                        # fade out while the next fades in; [] runs the wall silent
   confirm_s: 2.0      # after a fire, confirm over REST within this long that the right clip connected
   confirm_poll_s: 0.5 # how often to look while confirming
   rest_timeout_s: 5.0 # how long one REST request may take at start-up
@@ -18,7 +18,8 @@ resolume:
 
 clock:
   clip_s: 60.0        # every clip is this long; the controller fires the next on its own clock
-  audio_lead_s: 5.0   # stems for the next arm start this long before the video
+  audio_lead_s: 6.0   # a clip's sound starts this long before its picture; Karl's files carry
+                      # six seconds either side of the sixty (his note of 21 Nov 2026)
 
 map:
   # Arm letters confirmed by Sam, 5 October 2026. c (Cargo) is to be
@@ -64,3 +65,13 @@ personalities:
 personality_order: [Courtier, Operator, Accountant, Naif]  # the day of the year, modulo four, picks the day
 
 ledger_path: ledger.jsonl   # the same file the sensing bus writes; the controller appends decision and outcome
+
+sound:
+  # Read only by `python -m cockaigne_controller.load_sounds`, which puts each clip's
+  # sound file into the clip's own column on the sound layers. Run it once per composition.
+  folder: C:/cockaigne e29/sound       # searched with its subfolders for *.wav
+  name_pattern: "_([a-z][0-9][a-z][0-9])_au"   # where the clip name sits in a sound file's name
+  renames:                             # files delivered under another clip's name: path ending -> true clip
+    "level 3 herd/level 3_f3u3_au.wav": h3a3      # to be confirmed by Karl
+    "level 4 machine/level 4_h4u4_au.wav": m4a4   # to be confirmed by Karl
+  play_mode: "Play Once & Clear"       # a sound plays through once and frees its layer

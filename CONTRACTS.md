@@ -2,7 +2,7 @@
 
 The JSON messages that pass between modules. These are fixed. Any change is agreed first and logged in `DECISIONS.md`, and every module that reads or writes the message is updated in the same commit.
 
-All times are seconds as a float. Live, `t` is `time.monotonic()` on the sensing machine. From a file, `t` is the frame's time within the file; under replay the controller still runs on its own clock, so a mixed recording does not share one timeline. A decision's `t` is when it was planned, at the audio lead, about five seconds before it fires. All positions are in metres on a floor plan. The origin is the corner where the data wall meets the left arm of the U. `x` runs along the data wall. `y` is 0 at the data wall and increases toward the closed end of the U. Confidences run 0 to 1.
+All times are seconds as a float. Live, `t` is `time.monotonic()` on the sensing machine. From a file, `t` is the frame's time within the file; under replay the controller still runs on its own clock, so a mixed recording does not share one timeline. A decision's `t` is when it was planned, at the audio lead, six seconds before it fires. All positions are in metres on a floor plan. The origin is the corner where the data wall meets the left arm of the U. `x` runs along the data wall. `y` is 0 at the data wall and increases toward the closed end of the U. Confidences run 0 to 1.
 
 ## Contract 0 — camera tracks
 

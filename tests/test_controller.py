@@ -171,13 +171,46 @@ def test_unconfirmed_fire_keeps_the_displayed_position():
 
 
 def test_clock_fires_audio_lead_then_clip():
-    clock = ClipClock(clip_s=60.0, audio_lead_s=5.0)
+    clock = ClipClock(clip_s=60.0, audio_lead_s=6.0)
+    # At start-up the sound goes first and the picture follows the lead.
+    assert clock.audio_due(94.0) and not clock.clip_due(94.0)
+    clock.mark_audio(94.0)
+    assert not clock.audio_due(95.0) and not clock.clip_due(99.9)
+    assert clock.clip_due(100.0)
     clock.start(100.0)
-    assert not clock.audio_due(154.9) and not clock.clip_due(159.9)
-    assert clock.audio_due(155.0)
-    clock.mark_audio()
+    assert not clock.audio_due(153.9) and not clock.clip_due(159.9)
+    assert clock.audio_due(154.0)
+    clock.mark_audio(154.0)
     assert not clock.audio_due(156.0)   # once per clip
     assert clock.clip_due(160.0)
+
+
+def test_sounds_take_turns_on_the_sound_layers():
+    from cockaigne_controller.audio import Sound
+
+    class Sent:
+        def __init__(self): self.fired = []
+        def fire_clip(self, layer, index):
+            self.fired.append((layer, index))
+            return True
+    res, sound = Sent(), Sound([2, 3])
+    assert [sound.start(res, i) for i in (7, 9, 4)] == [2, 3, 2]
+    assert res.fired == [(2, 7), (3, 9), (2, 4)]   # same column as the picture
+    assert Sound([]).start(res, 1) is None          # no sound layers: silent, no message
+
+
+def test_sound_files_are_matched_to_clips_by_name(tmp_path):
+    from cockaigne_controller.load_sounds import find_sounds
+    for rel in ("arch/arch_a1a2_au.wav", "level 3 feast/level 3_f3u3_au.wav",
+                "level 3 herd/level 3_f3u3_au.wav", "furniture/furntiture_b1u1_au.wav",
+                "arch/copy_a1a2_au.wav", "notes.wav"):
+        (tmp_path / rel).parent.mkdir(exist_ok=True)
+        (tmp_path / rel).write_bytes(b"")
+    found, complaints = find_sounds(str(tmp_path), "_([a-z][0-9][a-z][0-9])_au",
+                                    {"level 3 herd/level 3_f3u3_au.wav": "h3a3"})
+    assert set(found) == {"a1a2", "f3u3", "h3a3", "b1u1"}
+    assert found["h3a3"].parent.name == "level 3 herd"
+    assert len(complaints) == 2   # the second a1a2 file, and the file with no clip name
 
 
 def test_occupancy_context_comes_from_n_smooth():
@@ -198,8 +231,8 @@ def test_layout_from_composition_reads_nested_names():
 
 
 def test_osc_loopback_against_the_fake():
-    # The one loopback test: a clip fire and a volume change arrive at the
-    # fake Resolume exactly as Resolume would see them.
+    # The one loopback test: a clip fire arrives at the fake Resolume
+    # exactly as Resolume would see it.
     import time
     from cockaigne_controller.fake_resolume import FakeResolume
     from cockaigne_controller.resolume import Resolume
@@ -208,16 +241,12 @@ def test_osc_loopback_against_the_fake():
     try:
         res = Resolume("127.0.0.1", fake.port, rest_port=0)
         res.fire_clip(1, 47)
-        res.set_volume(3, 0.8)
         deadline = time.time() + 2
-        while len(fake.received) < 2 and time.time() < deadline:
+        while len(fake.received) < 1 and time.time() < deadline:
             time.sleep(0.02)
     finally:
         fake.stop()
     assert ("/composition/layers/1/clips/47/connect", (1,)) in fake.received
-    volume = next(args for addr, args in fake.received
-                  if addr == "/composition/layers/3/audio/volume")
-    assert volume[0] == pytest.approx(0.8)  # OSC carries 32-bit floats
 
 
 def test_connected_clip_is_read_from_the_layer_json():
@@ -285,7 +314,6 @@ def test_fire_clip_itself_never_raises():
         raise OSError("network is down")
     res._osc.send_message = broken
     assert res.fire_clip(1, 3) is False
-    assert res.set_volume(2, 0.5) is False
 
 
 def test_controller_refuses_a_holey_pool():

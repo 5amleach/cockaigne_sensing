@@ -3,8 +3,9 @@
 Usage:
     python -m cockaigne_controller.run [--config ...] [--layout pool.json] [--record out.jsonl]
 
-Reads crowd state from the bus, fires one clip per cycle in Resolume,
-publishes each decision back through the bus and appends ledger entries.
+Reads crowd state from the bus, fires one clip per cycle in Resolume with
+its sound a few seconds ahead of the picture (audio.py), publishes each
+decision back through the bus and appends ledger entries.
 Fail-safes, all logged to the terminal and to controller.log_path:
 
 - Resolume's REST not ready at start-up: retried every reconnect_s.
@@ -31,7 +32,7 @@ import time
 # shares the ledger file by design (BRIEF.md, "The ledger").
 from cockaigne_sensing.bus import Ledger, Recorder
 
-from . import audio
+from .audio import Sound
 from .clipmap import ClipMap
 from .clock import ClipClock
 from .config import load
@@ -195,6 +196,7 @@ async def run(cfg: dict, layout_path: str | None = None, record: str | None = No
 
     controller = Controller(cfg, clipmap, layout)
     clock = ClipClock(cfg["clock"]["clip_s"], cfg["clock"]["audio_lead_s"])
+    sound = Sound(res_cfg["sound_layers"])
     ledger = Ledger(cfg["ledger_path"])
     recorder = Recorder(record) if record else None
     link = BusLink(cfg["bus"]["url"], controller, log, cfg["controller"]["reconnect_s"])
@@ -214,12 +216,12 @@ async def run(cfg: dict, layout_path: str | None = None, record: str | None = No
             if not blind and was_blind:
                 log.info("crowd state is back")
             was_blind = blind
-            if clock.started is None or clock.clip_due(now):
+            if clock.clip_due(now):
                 if clock.started is not None:
                     late = now - clock.started - clock.clip_s
                     if late > 1.0:
                         log.warning(f"firing {late:.1f} s late")
-                if pending is None:  # the very first clip has no audio lead
+                if pending is None:  # cannot happen: the sound lead always decides first
                     pending = controller.decide(now)
                 decision, (layer, index) = pending
                 pending = None
@@ -248,8 +250,9 @@ async def run(cfg: dict, layout_path: str | None = None, record: str | None = No
                          f"{'' if ok else ', UNCONFIRMED'})")
             elif clock.audio_due(now):
                 pending = controller.decide(now)
-                audio.set_stems(resolume, cfg, pending[0]["ring_target"])
-                clock.mark_audio()
+                if sound.layers and sound.start(resolume, pending[1][1]) is None:
+                    log.warning(f"sound for {pending[0]['clip']} could not be started")
+                clock.mark_audio(now)
             for w in controller.warnings:
                 log.warning(w)
             controller.warnings.clear()

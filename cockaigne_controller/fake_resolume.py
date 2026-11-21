@@ -1,7 +1,7 @@
 """A stand-in for Resolume: listens on the OSC port and prints what arrives.
 
 Run it in one terminal with Resolume closed, run the controller in another,
-and every clip fire and volume change is printed as it happens. The tests
+and every clip fire, picture or sound, is printed as it happens. The tests
 use the same listener on a system-chosen port.
 
 Usage:

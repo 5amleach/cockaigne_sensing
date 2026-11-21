@@ -74,7 +74,20 @@ The first command times ten stills from the camera and prints how long they took
 
 The fake Resolume prints every clip fire it receives. `--layout` is a saved clip list, used because there is no Resolume to ask; no `pool.json` is checked in, so generate one first (a JSON list of clip names covering the map — the tests' `full_pool()` in `tests/helpers.py` is the model).
 
+## Sound
+
+Each clip has one sound file, twelve seconds longer than the clip. The controller starts it six seconds before the picture, on layer 2 or layer 3 in turn, so two sounds overlap around every cut. The sounds live in the composition, in the same column as their clip on both layers. To put them there, once per composition, with Resolume open and the composition loaded:
+
+```
+python -m cockaigne_controller.load_sounds --dry-run     (lists clips without a sound, changes nothing)
+python -m cockaigne_controller.load_sounds               (loads them; then save the composition in Resolume)
+```
+
+The folder it reads and the two sound layers are in `config/controller.yaml`. The picture layer must sit at zero transition, and the sound layers need nothing else set.
+
 ## What failure looks like, and what to do
+
+**The picture plays but there is no sound.** Look at layers 2 and 3 in Resolume: each should show a sound starting six seconds before every picture change. If the layers are empty, the composition was saved without its sounds; run `load_sounds` again. If sounds start but nothing is heard, check the layer volumes, the composition's master volume and the audio output in Resolume's preferences.
 
 **The wall sits on one clip and the data screen shows no new decisions.** The controller has died; what the wall shows meanwhile is Resolume's own behaviour (typically the current clip looping or holding). Restart the controller. It starts at Barren and climbs again; beliefs learned earlier that day are lost, which is acceptable.
 
