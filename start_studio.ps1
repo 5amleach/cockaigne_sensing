@@ -4,12 +4,15 @@
 # A desktop shortcut runs this file. Running it again restarts the sensing
 # chain and the controller cleanly, and leaves Resolume as it is.
 #   -Stop     closes the sensing chain and the controller, and nothing else.
+#   -Stop -All  closes Resolume as well, which takes its full-screen picture
+#             off the monitors. The Cockaigne STOP shortcut does this, and its
+#             key (Ctrl+Alt+S) works even when the picture covers the desktop.
 #   -NoWall   does not open the data wall page.
 #
 # Each of the two programs gets its own window, titled "Cockaigne sensing" and
 # "Cockaigne controller". The windows stay open if a program stops, so its
 # last words can be read. See RUNBOOK.md, "The studio shed, one double-click".
-param([switch]$Stop, [switch]$NoWall)
+param([switch]$Stop, [switch]$All, [switch]$NoWall)
 
 $repo        = $PSScriptRoot
 $python      = Join-Path $repo ".venv\Scripts\python.exe"
@@ -19,7 +22,12 @@ $avenue      = "C:\Program Files\Resolume Avenue\Avenue.exe"
 $arena       = "C:\Program Files\Resolume Arena\Arena.exe"
 if (Test-Path $avenue) { $arena = $avenue }
 $resolume    = [IO.Path]::GetFileNameWithoutExtension($arena)   # "Avenue" or "Arena", the process name
-$composition = Join-Path ([Environment]::GetFolderPath("MyDocuments")) "Resolume Arena\Compositions\cockaigne_studio.avc"
+# The composition with the sounds loaded (RUNBOOK.md, "Sound"), wherever Resolume saved it.
+$compositionName = "cockaigne_e29"
+$documents   = [Environment]::GetFolderPath("MyDocuments")
+$composition = "Resolume Avenue", "Resolume Arena" |
+    ForEach-Object { Join-Path $documents "$_\Compositions\$compositionName.avc" } |
+    Where-Object { Test-Path $_ } | Select-Object -First 1
 $edge        = "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
 $wallSpot    = "1.75,3.5"   # the viewing spot in config/studio.yaml, drawn on the wall's floor plan
 $restUrl     = "http://127.0.0.1:8080/api/v1/composition"
@@ -67,7 +75,12 @@ Set-Location $repo
 
 if ($Stop) {
     $n = Stop-Ours
-    Say "Stopped the sensing chain and the controller ($n processes). Resolume is untouched." "Green"
+    if ($All) {
+        Get-Process Avenue, Arena -ErrorAction SilentlyContinue | Stop-Process -Force
+        Say "Stopped the sensing chain, the controller ($n processes) and Resolume." "Green"
+    } else {
+        Say "Stopped the sensing chain and the controller ($n processes). Resolume is untouched." "Green"
+    }
     Start-Sleep -Seconds 3
     exit 0
 }
@@ -84,8 +97,8 @@ if (-not (Test-Path (Join-Path $repo "camera_password.txt")) -and -not $env:COCK
 # 2. Resolume, with the Cockaigne composition loaded.
 if (-not (Get-Process Avenue, Arena -ErrorAction SilentlyContinue)) {
     if (-not (Test-Path $arena))       { Fail "Resolume is missing at $arena" }
-    if (-not (Test-Path $composition)) { Fail "The composition is missing at $composition" }
-    Say "Starting Resolume $resolume with cockaigne_studio ..."
+    if (-not $composition) { Fail "The composition $compositionName.avc is not in Documents\Resolume Avenue\Compositions" }
+    Say "Starting Resolume $resolume with $compositionName ..."
     Start-Process $arena -ArgumentList "`"$composition`"" -WorkingDirectory (Split-Path $arena)
 } else {
     Say "Resolume is already running."
@@ -97,7 +110,7 @@ foreach ($i in 1..60) {
     Start-Sleep -Seconds 2
 }
 if ($clips -lt 0) { Fail "Resolume does not answer on port 8080. In Resolume: Preferences, Webserver, switch it on." }
-if ($clips -lt $minClips) { Fail "Resolume is open but layer 1 holds $clips clips. Load the cockaigne_studio composition, then double-click again." }
+if ($clips -lt $minClips) { Fail "Resolume is open but layer 1 holds $clips clips. Load the $compositionName composition, then double-click again." }
 Say "Resolume is ready: $clips clips on layer 1." "Green"
 
 # 3. A clean slate, then the sensing chain.
@@ -125,5 +138,5 @@ if (-not $NoWall) {
 
 Say ""
 Say "Running. One clip fires each minute; walk into the shed and the ring climbs." "Cyan"
-Say "To stop: close the two Cockaigne windows, or use the 'Cockaigne STOP' shortcut."
+Say "To stop: press Ctrl+Alt+S, or use the 'Cockaigne STOP' shortcut."
 Start-Sleep -Seconds 12
