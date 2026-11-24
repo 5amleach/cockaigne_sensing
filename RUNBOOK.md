@@ -100,6 +100,16 @@ python -m cockaigne_controller.load_sounds               (loads them; then save 
 
 The folder it reads and the two sound layers are in `config/controller.yaml`. The picture layer must sit at zero transition, and the sound layers need nothing else set.
 
+### Speakers
+
+The sound goes out through a USB audio interface, an Arturia MiniFuse 1, to two Yamaha HS8 speakers. Windows names the interface "MiniFuse 1 Start". Resolume's own audio output is set to "Speakers (MiniFuse 1 Start)" in Preferences, Audio. This setting lives in Resolume's preferences on the render PC, not in the composition, so it survives opening any composition.
+
+- Plug the interface in before double-clicking START. Resolume picks its audio device when it opens.
+- Left speaker on the MiniFuse's left output, right speaker on its right output. The show is stereo.
+- Windows "Mono audio" (Settings, Accessibility, Audio) must be off for the show. It is only for testing with one speaker.
+- HS8s are loud. Turn the MiniFuse output knob and the speaker knobs down before the first sound, then bring them up.
+- If the picture plays but nothing is heard, check Resolume Preferences, Audio, output device is the MiniFuse, then the composition's master volume.
+
 ## Full-size pictures
 
 The show composition `cockaigne_e29` plays small copies of the clips. `cockaigne_e29_full` is the same composition with every slot pointed at its full-size master (8064 x 1176 ProRes, on two drives). It was made by opening a copy of the show composition in Resolume and running:
