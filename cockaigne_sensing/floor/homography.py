@@ -21,6 +21,17 @@ def load_homography(path: str | Path) -> tuple[np.ndarray, tuple[int, int] | Non
     return np.array(data["H"], dtype=float), (int(size[0]), int(size[1])) if size else None
 
 
+def load_calibration(path: str | Path) -> dict:
+    """Everything a calibration file holds: the matrix "H", the image "size"
+    (or None), and, when the calibration recorded them, the "lens" bend and
+    the camera "pose" (see lens.py). Older files give None for the last two."""
+    data = json.loads(Path(path).read_text())
+    size = data.get("image_size")
+    return {"H": np.array(data["H"], dtype=float),
+            "size": (int(size[0]), int(size[1])) if size else None,
+            "lens": data.get("lens"), "pose": data.get("pose")}
+
+
 def feet_point(box) -> tuple[float, float]:
     """Bottom centre of a person's rectangle: roughly where their feet touch the floor."""
     x1, y1, x2, y2 = box

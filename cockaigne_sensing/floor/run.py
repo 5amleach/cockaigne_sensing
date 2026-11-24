@@ -25,7 +25,8 @@ import numpy as np
 
 from ..bus import Recorder, replay
 from ..config import load
-from .homography import feet_point, load_homography, pixel_to_floor
+from .homography import feet_point, load_calibration, pixel_to_floor
+from .lens import fits_a_person, straighten
 from .tracker import FloorTracker, Sighting, people_message
 
 
@@ -43,14 +44,18 @@ class FloorStage:
                                     ft["velocity_window_s"], gate_m=ft["gate_m"],
                                     coast_s=ft["coast_s"], bounds=(self.W, self.L),
                                     same_camera_iou=ft["same_camera_iou"])
+        self.height_check = ft["height_check"]
         self.log = logging.getLogger("cockaigne_sensing.floor")
         self.H: dict[str, tuple[np.ndarray, tuple[int, int] | None]] = {}
+        self.cal: dict[str, dict] = {}
         self.polygon: dict[str, np.ndarray | None] = {}
         self._warned: dict[str, float] = {}
         for cam in cfg["cameras"]:
             path = Path(cam.get("homography", ""))
             if path.is_file():
-                self.H[cam["name"]] = load_homography(path)
+                cal = load_calibration(path)
+                self.cal[cam["name"]] = cal
+                self.H[cam["name"]] = (cal["H"], cal["size"])
                 poly = cam.get("floor_polygon") or []
                 self.polygon[cam["name"]] = np.array(poly, dtype=np.float32) if poly else None
         self._bucket_t = None
@@ -83,15 +88,26 @@ class FloorStage:
                 return []
             scale = size[0] / msg["w"]
         poly = self.polygon.get(camera)
+        lens, pose = self.cal[camera]["lens"], self.cal[camera]["pose"]
+        hc = self.height_check
         out = []
         for tr in msg["tracks"]:
             u, v = feet_point(tr["box"])
             if poly is not None and cv2.pointPolygonTest(poly, (float(u), float(v)), False) < 0:
                 continue
-            x, y = pixel_to_floor(H, u * scale, v * scale)
+            u, v = u * scale, v * scale
+            if lens:   # this calibration knows the lens bend: straighten the feet point first
+                u, v = straighten(u, v, lens, size)
+            x, y = pixel_to_floor(H, u, v)
             if not (-self.margin <= x <= self.W + self.margin and -self.margin <= y <= self.L + self.margin):
                 continue  # feet off the floor: wall imagery, or a lens-edge error
             x1, y1, x2, y2 = tr["box"]
+            if lens and pose and hc["enabled"]:
+                if y2 >= msg["h"] - hc["cut_off_px"]:
+                    continue  # feet below the picture's edge: the box's foot is not the person's
+                box = [c * scale for c in tr["box"]]
+                if not fits_a_person(box, x, y, pose, lens, size, hc["low_m"], hc["high_m"], hc["slack_px"]):
+                    continue  # too tall or too short for a person standing there: wall imagery
             out.append(Sighting(x, y, (x2 - x1) / max(1.0, y2 - y1), y2 - y1, tr["conf"],
                                 camera=camera, det_id=tr["id"], box=tuple(tr["box"]),
                                 w=msg["w"], h=msg["h"]))

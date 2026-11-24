@@ -156,3 +156,58 @@ def test_venue_fixture_runs_through_the_stage():
                 worst = max(worst, -p["x"], p["x"] - W, -p["y"], p["y"] - L)
     assert n_msgs > 900 and n_with_people > 500
     assert worst <= 0.31  # nothing beyond the floor plus the allowed margin
+
+
+def _bent_camera_file(tmp_path):
+    """A calibration that records a lens bend and the camera's place, like the
+    23 Nov Light Room fit: 3.3 m up at the closed end, looking back at 19 degrees."""
+    import cv2
+    from cockaigne_sensing.floor.lens import picture_height, straighten
+    lens, pose, size = {"f": 436.0, "k1": 0.8}, [3.6, 8.7, 3.3, 180.0, 19.0, 0.0], (640, 360)
+
+    def to_pixel(x, y):
+        # The column: project with the bend, using the same steps lens.py uses.
+        from cockaigne_sensing.floor.lens import _axes
+        cam = (np.array([x, y, 0.0]) - np.array(pose[:3])) @ _axes(*pose[3:]).T
+        xu, yu = cam[0] / cam[2], cam[1] / cam[2]
+        xd, yd = xu, yu
+        for _ in range(8):
+            s = 1 + lens["k1"] * (xd * xd + yd * yd)
+            xd, yd = xu / s, yu / s
+        return size[0] / 2 + lens["f"] * xd, size[1] / 2 + lens["f"] * yd
+
+    floor = np.array([[1.0, 1.0], [6.2, 1.0], [6.2, 5.0], [1.0, 5.0]], np.float32)
+    px = np.array([straighten(*to_pixel(x, y), lens, size) for x, y in floor], np.float32)
+    H = cv2.getPerspectiveTransform(px, floor)
+    path = tmp_path / "bent.json"
+    path.write_text(json.dumps({"H": H.tolist(), "image_size": list(size), "lens": lens, "pose": pose}))
+    return path, to_pixel, lambda x, y, z: picture_height(pose, lens, size, x, y, z)
+
+
+def test_lens_bend_is_straightened_and_wall_figures_fail_the_height_check(tmp_path):
+    path, to_pixel, row_at = _bent_camera_file(tmp_path)
+    cfg = load()
+    cfg["floor"] = {"width_m": 7.2, "length_m": 9.6}
+    cfg["cameras"] = [{"name": "c", "homography": str(path), "floor_polygon": []}]
+    stage = FloorStage(cfg)
+
+    def box_for(x, y, tall_m):
+        u, v = to_pixel(x, y)
+        return [u - 15, row_at(x, y, tall_m), u + 15, v]
+
+    msg = {"t": 1.0, "camera": "c", "w": 640, "h": 360, "tracks": [
+        {"id": 1, "box": box_for(1.2, 2.0, 1.7), "conf": 0.9},   # a visitor near the picture's edge
+        {"id": 2, "box": box_for(6.8, 3.5, 5.0), "conf": 0.5},   # a figure on the wall, far too tall
+        {"id": 3, "box": box_for(3.6, 3.0, 0.3), "conf": 0.5},   # far too short to be anyone
+    ]}
+    sightings = stage.sightings(msg)
+    assert [s.det_id for s in sightings] == [1]
+    # The bend is undone, so the edge-of-picture visitor lands where they stand.
+    assert abs(sightings[0].x - 1.2) < 0.05 and abs(sightings[0].y - 2.0) < 0.05
+    # A box whose bottom is on the picture's lower edge has its feet out of view.
+    msg["tracks"] = [{"id": 4, "box": [300, 150, 340, 359], "conf": 0.9}]
+    assert stage.sightings(msg) == []
+    # With the check switched off in config, the wall figure is kept again.
+    cfg["floor_tracker"] = dict(cfg["floor_tracker"], height_check=dict(cfg["floor_tracker"]["height_check"], enabled=False))
+    msg["tracks"] = [{"id": 2, "box": box_for(6.8, 3.5, 5.0), "conf": 0.5}]
+    assert len(FloorStage(cfg).sightings(msg)) == 1

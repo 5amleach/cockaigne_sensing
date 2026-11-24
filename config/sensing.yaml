@@ -60,6 +60,12 @@ floor_tracker:
   bucket_s: 0.1           # camera messages within this window count as one instant
   margin_m: 0.3           # observed feet may fall this far outside the floor and still count
   warn_every_s: 30        # a camera problem is said at most this often
+  height_check:           # used only for a camera whose calibration records its lens and position (floor/lens.py)
+    enabled: true
+    low_m: 0.6            # a box shorter than a figure this tall, standing where its feet land, is dropped; seated and crouching visitors are about 0.8 to 1.2 m
+    high_m: 2.1           # a box taller than a figure this tall is dropped: figures in the wall imagery are many times too tall
+    slack_px: 4           # allowance in pixels for a loose box
+    cut_off_px: 3         # a box whose bottom is this close to the picture's lower edge has its feet out of view and is dropped
 
 cohesion:
   smooth_window_s: 10.0   # weighted average window for the raw score
@@ -105,7 +111,7 @@ actions:
   live: false             # whether the live launcher runs the action sense at all; false until a model has been chosen on the bench
   model: qwen3-vl:4b-instruct   # Ollama model tag, chosen by Sam 16 Nov 2026 from the shed1 bench; "fake" answers none without looking
   ollama_url: http://127.0.0.1:11434   # the local model server; the code refuses any other machine
-  enabled: [phone, drink, eat]   # Sam confirmed 19 Sept 2026 that eat and drink are in scope
+  enabled: [phone]         # phone only from 24 Nov 2026: eating and drinking are not allowed in the LED room (Sam); was [phone, drink, eat]
   interval_s: 3.0         # the fastest any one person is asked about
   max_asks_per_s: 3.0     # ceiling on questions per second for the whole room; protects the graphics card that also plays the wall
   recheck_s: 1.0          # a person whose newest answer differs from the one before is asked again this soon

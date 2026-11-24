@@ -20,7 +20,9 @@ LOG = logging.getLogger("test_actions")
 
 
 def actions_cfg(**over):
-    cfg = load()["actions"]
+    # The show asks about phones only (24 Nov 2026), but the voting works for
+    # any list of words, so these tests keep three to exercise it.
+    cfg = dict(load()["actions"], enabled=["phone", "drink", "eat"])
     cfg.update(over)
     return cfg
 

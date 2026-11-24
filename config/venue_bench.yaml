@@ -1,4 +1,4 @@
-﻿# Bench configuration for the two 7 September venue clips. Same numbers as sensing.yaml,
+# Bench configuration for the two 7 September venue clips. Same numbers as sensing.yaml,
 # with the two bench cameras in place of the gallery cameras. Used by tests and bench notes.
 floor:
   width_m: 6.1
@@ -45,6 +45,7 @@ floor_tracker:
   bucket_s: 0.1
   margin_m: 0.3
   warn_every_s: 30
+  height_check: {enabled: true, low_m: 0.6, high_m: 2.1, slack_px: 4, cut_off_px: 3}
 cohesion:
   smooth_window_s: 10.0
   still_speed_mps: 0.15
