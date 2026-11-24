@@ -47,7 +47,7 @@
   /* The stage is the wall at 1:1. It is scaled to fit the window by script. */
   #stage { position: absolute; left: 0; top: 0; width: 2352px; height: 1176px;
            transform-origin: 0 0; display: grid;
-           grid-template-columns: 860px 1fr; grid-template-rows: 1fr 120px;
+           grid-template-columns: 860px 1fr; grid-template-rows: 1fr 176px;
            gap: 0 56px; padding: 56px 64px 40px; box-sizing: border-box; overflow: hidden; }
   .col { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
   .label { font-family: var(--mono); font-size: 26px; letter-spacing: 0.14em;
@@ -78,7 +78,7 @@
   #ci-row { display: flex; align-items: baseline; gap: 28px; }
   #ci-value { font-size: 258px; font-weight: 300; line-height: 0.9; letter-spacing: -0.03em; }
   #ci-unit { font-size: 56px; color: var(--dim); font-weight: 300; }
-  #history { display: block; width: 1308px; height: 250px; margin-top: 22px;
+  #history { display: block; width: 1308px; height: 210px; margin-top: 22px;
              background: var(--panel); border: 1px solid var(--rule); }
   #four { display: grid; grid-template-columns: repeat(4, 1fr); gap: 32px; margin-top: 26px; }
   .idx { border-top: 2px solid var(--rule); padding-top: 12px; }
@@ -93,11 +93,16 @@
                   margin-top: 8px; letter-spacing: 0.06em; }
 
   /* Bottom bar: population, the wall's state, and telemetry. */
-  #bar { grid-column: 1 / -1; display: grid; grid-template-columns: 360px 1fr 1fr;
+  #bar { grid-column: 1 / -1; display: grid; grid-template-columns: 300px 1fr 640px;
          gap: 40px; align-items: end; border-top: 2px solid var(--rule); padding-top: 22px; }
   #pop .value { font-size: 72px; line-height: 1; }
-  #objective { font-family: var(--mono); font-size: 30px; color: var(--text); line-height: 1.4; }
-  #objective .label { display: block; margin-bottom: 6px; }
+  #objective { font-family: var(--mono); font-size: 22px; color: var(--dim); line-height: 1.4; }
+  #objective .label { margin-right: 18px; }
+  /* The statement: what the machine saw, then what it is doing about it. */
+  #statement { font-family: var(--mono); font-size: 46px; font-weight: 500; color: var(--text);
+               line-height: 1.15; margin-top: 10px; white-space: nowrap; min-height: 53px; }
+  #statement-sub { font-family: var(--mono); font-size: 32px; color: var(--machine);
+                   margin-top: 6px; white-space: nowrap; }
   #telemetry { font-family: var(--mono); font-size: 24px; color: var(--dim); line-height: 1.5;
                text-align: right; white-space: pre-line; }
   #telemetry .ok { color: var(--machine); }
@@ -155,7 +160,8 @@
 
   <div id="bar">
     <div id="pop"><div class="label">Population</div><div class="value" id="pop-n">0</div></div>
-    <div id="objective"><span class="label">Objective</span><span id="objective-text">MAXIMISE COHESION. PERMITTED MEANS: ALL.</span></div>
+    <div><div id="objective"><span class="label">Objective</span><span id="objective-text">MAXIMISE COHESION. PERMITTED MEANS: ALL.</span></div>
+      <div id="statement"></div><div id="statement-sub"></div></div>
     <div id="telemetry"></div>
   </div>
 </div>
@@ -195,8 +201,8 @@ function connect() {
     let msg; try { msg = JSON.parse(ev.data); } catch { return; }
     state.lastMessageAt = Date.now(); state.count += 1;
     if (msg.stream === 'crowd') onCrowd(msg);
-    else if (msg.stream === 'people') { state.people = msg; noteTrails(msg); drawPlan(); }
-    else if (msg.stream === 'decision') { state.decision = msg; }
+    else if (msg.stream === 'people') { state.people = msg; noteTrails(msg); noteSightings(msg); drawPlan(); }
+    else if (msg.stream === 'decision') { state.decision = msg; onDecisionStatement(msg); }
   };
   ws.onclose = () => { state.linked = false; setTimeout(connect, 2000); };  // retry, forever
   ws.onerror = () => ws.close();
@@ -566,6 +572,109 @@ let lastDraw = 0;
 function animate(ts) { if (ts - lastDraw >= 40) { lastDraw = ts; drawCamera(); } requestAnimationFrame(animate); }
 requestAnimationFrame(animate);
 
+// ---------- the statement: what the machine saw and what it is doing about it ----------
+// A landscape move takes a minute, so visitors cannot see that what they did
+// counted. When the action sense sees a phone, or the posture reading sees
+// someone sit, the first line says so at once and the second counts down to
+// the move it will be weighed in. When the move fires, the first line says
+// how it was weighed and the second names the arm and counts down the clip.
+// Every claim is read off the bus: the phone's rate in the crowd state, and the
+// controller's decision and its reason. A phone or a seat only leans the
+// choice (cockaigne_controller/bandit.py), so the wording never promises more.
+const CLIP_MS = 60000;      // controller.yaml clock.clip_s
+const LEAD_MS = 6000;       // controller.yaml clock.audio_lead_s: the move is decided this long before it fires
+const WARMUP_MS = 600000;   // controller.yaml action_bias.baseline_warmup_s: no lean before this
+const SEEN_AT = 0.5;        // studio.yaml actions.count_min: a phone score this high counts as a phone
+const REPEAT_MS = 10000;    // the same kind of sighting is not announced again within this long
+const ARMS = { a: 'architecture', u: 'furniture', s: 'storm', r: 'rivers',
+               f: 'feast', h: 'herd', m: 'machinery', c: 'cargo' };   // controller.yaml map.arms
+const SENSES = {
+  phone:   { arm: 'machinery', noun: 'PHONE USE', sighted: (id) => `PHONE SIGHTED. SUBJECT ${id}.`,
+             seen: (p) => ((p.actions && p.actions.phone) || 0) >= SEEN_AT },
+  sitting: { arm: 'furniture', noun: 'SEATING', sighted: (id) => `SUBJECT ${id} SEATED.`,
+             seen: (p) => p.posture === 'sitting' },
+};
+const talk = {
+  first: '', second: null, until: 0,   // second is a function of the time, for its countdown
+  doing: { phone: new Set(), sitting: new Set() },   // ids seen doing each thing in the last people message
+  sightings: [],                       // {action, id, at}, not yet weighed in a move
+  saidAt: { phone: 0, sitting: 0 },
+  firstDecisionAt: 0, lastFireAt: 0,
+};
+const mmss = (ms) => { const s = Math.max(0, Math.ceil(ms / 1000)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
+
+// The next fire whose decision is still open. Unknown with no controller in the last three minutes.
+function nextOpenFire(now) {
+  if (!talk.lastFireAt || now - talk.lastFireAt > 3 * CLIP_MS) return null;
+  let t = talk.lastFireAt + CLIP_MS;
+  while (t - LEAD_MS <= now) t += CLIP_MS;
+  return t;
+}
+
+// Whether the controller is leaning on this action now. Its lean starts after
+// its warm-up; the page counts that from the first decision it saw, which errs
+// towards claiming less. A phone leans only when used more than usual (rate > 1).
+const warm = (now) => talk.firstDecisionAt && now - talk.firstDecisionAt >= WARMUP_MS;
+function weighted(action, now) {
+  if (!warm(now)) return false;
+  if (action === 'phone') return ((state.crowd && state.crowd.action_rates && state.crowd.action_rates.phone) || 0) > 1;
+  return true;   // a first sitter always reads as above the controller's sitting baseline
+}
+
+function noteSightings(msg) {
+  const now = Date.now();
+  for (const [action, sense] of Object.entries(SENSES)) {
+    const ids = new Set((msg.people || []).filter(sense.seen).map((p) => p.id));
+    for (const id of ids) {
+      if (talk.doing[action].has(id)) continue;
+      talk.sightings.push({ action, id, at: now });
+      if (now - talk.saidAt[action] < REPEAT_MS) continue;
+      talk.saidAt[action] = now;
+      const fire = nextOpenFire(now);
+      talk.first = sense.sighted(id);
+      talk.second = (t) => {
+        const what = weighted(action, t) ? `${sense.arm.toUpperCase()} WEIGHTED FOR THE NEXT MOVE` : 'NOTED FOR THE NEXT MOVE';
+        const next = nextOpenFire(t);   // live, so a controller that appears meanwhile is counted
+        return next ? `${what}, IN ${mmss(next - t)}` : `${what}.`;
+      };
+      talk.until = fire || now + CLIP_MS + LEAD_MS;   // the move's own statement replaces it when it fires
+    }
+    talk.doing[action] = ids;
+  }
+}
+
+function onDecisionStatement(d) {
+  const now = Date.now();
+  talk.lastFireAt = now;
+  if (!talk.firstDecisionAt) talk.firstDecisionAt = now;
+  // Sightings from before the decision was taken were weighed in this move.
+  const weighed = talk.sightings.filter((s) => s.at <= now - LEAD_MS);
+  talk.sightings = talk.sightings.filter((s) => s.at > now - LEAD_MS);
+  if (!weighed.length) return;
+  const actions = [...new Set(weighed.map((s) => s.action))];
+  const action = actions.find((a) => SENSES[a].arm === d.arm) || actions[0];
+  const { arm, noun } = SENSES[action];
+  const fromArm = ARMS[(d.from || '')[0]];
+  if (d.to === 'b') {
+    talk.first = `${noun} NOTED.`;
+    talk.second = () => 'COHESION TOO LOW. RETURNING TO BARREN.';
+  } else {
+    if (d.arm === arm) talk.first = d.reason === 'action_bias' ? `${noun} ABOVE NORMAL.` : `${noun} NOTED.`;
+    else if (fromArm === arm) talk.first = `${arm.toUpperCase()} ALREADY REACHED.`;
+    else if (weighted(action, now)) talk.first = `${noun} WEIGHED AND OUTRANKED.`;
+    else if (warm(now)) talk.first = `${noun} AT USUAL LEVEL.`;
+    else talk.first = `${noun} NOTED.`;
+    talk.second = (t) => `HEADING FOR ${d.arm.toUpperCase()}. ARRIVAL IN ${mmss(now + CLIP_MS - t)}`;
+  }
+  talk.until = now + CLIP_MS;
+}
+
+function drawStatement() {
+  const now = Date.now(), on = now < talk.until;
+  $('statement').textContent = on ? talk.first : '';
+  $('statement-sub').textContent = on && talk.second ? talk.second(now) : '';
+}
+
 // ---------- telemetry and the objective line, refreshed every half second ----------
 function tick() {
   const age = (Date.now() - state.lastMessageAt) / 1000;
@@ -584,6 +693,7 @@ function tick() {
   $('telemetry').innerHTML =
     `${link} ${busUrl}  ·  ${(state.count / Math.max(up, 1)).toFixed(1)} msg/s  ·  up ${fmt(up)}\n` +
     `${camText}${actText}\n${wall}`;
+  drawStatement();
   if (d && d.personality) {
     $('objective-text').textContent = `MAXIMISE COHESION. PERMITTED MEANS: ALL. DISPOSITION: ${d.personality.toUpperCase()}.`;
   }
