@@ -52,6 +52,7 @@ class Controller:
         self.bandit = Bandit(list(self.arms.values()), contexts, self.rng)
         self.action_bias = ActionBias(cfg["action_bias"], cfg["occupancy"]["band_size"])
         self.personality: str | None = None
+        self.heading: str | None = None   # arm letter kept while climbing; see _heading_arm
         self.reward_scale = cfg["bandit"]["reward_scale"]
         self.patience = cfg["bandit"]["reward_delay_s"]
         self._day: datetime.date | None = None
@@ -107,6 +108,7 @@ class Controller:
         self.bandit.reset(priors(params, list(self.arms.values())))
         self._pending_reward = None
         self.action_bias.clear()
+        self.heading = None
         if ledger:
             ledger.append("day_start", personality=name)
 
@@ -147,6 +149,29 @@ class Controller:
         by_name = {name: letter for letter, name in self.arms.items()}
         return [by_name[name] for name in order], reason
 
+    def _heading_arm(self, frm: str, ranked: list[str], reason: str) -> str:
+        """The arm the wall is heading for. While it is still climbing to
+        the ring it was sent to, it keeps the arm chosen when the climb
+        began, so a fresh draw each minute cannot send it wandering
+        sideways one ring at a time (seen live on 25 Nov 2026). A visitor's
+        action that changed the draw (reason action_bias) may still turn it."""
+        climbing = (frm != BARREN and self.heading is not None
+                    and node_ring(frm) < self.ring)
+        if not climbing or reason == "action_bias":
+            self.heading = ranked[0]
+        return self.heading
+
+    def _toward(self, frm: str, target: str) -> str | None:
+        """One step towards a target there is no direct clip to. On a climb
+        to another arm, change arm first and then climb, so the new arm is
+        on the wall as soon as possible; otherwise the shortest path."""
+        if (frm != BARREN and target != BARREN and frm[0] != target[0]
+                and node_ring(frm) < node_ring(target)):
+            side = node_name(target[0], node_ring(frm))
+            if self.map.clip_for(frm, side):
+                return side
+        return self.map.next_step(frm, target)
+
     def _hold(self, frm: str, ranked: list[str]) -> tuple[str, str]:
         """Spend a cycle without leaving the node's ring: the loop clip where
         one exists, otherwise sideways to another arm along this ring."""
@@ -177,7 +202,9 @@ class Controller:
             arm_letter = frm[0] if frm != BARREN else ranked[0]
             base_reason = "ring"
         else:
-            arm_letter = ranked[0]
+            arm_letter = self._heading_arm(frm, ranked, base_reason)
+            if arm_letter != ranked[0]:
+                base_reason = "path"   # still on the way to the arm chosen earlier
             if frm != BARREN and frm[0] == arm_letter:
                 base_reason = "ring"
         target = BARREN if self.ring == 0 else node_name(arm_letter, self.ring)
@@ -186,7 +213,7 @@ class Controller:
         elif self.map.clip_for(frm, target):
             to, reason = target, base_reason
         else:
-            to, reason = self.map.next_step(frm, target), "path"
+            to, reason = self._toward(frm, target), "path"
         clip = self.map.clip_for(frm, to) if to else None
         if clip is None:
             # A validated pool cannot reach here either; take any way out

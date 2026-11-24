@@ -583,7 +583,7 @@ requestAnimationFrame(animate);
 // choice (cockaigne_controller/bandit.py), so the wording never promises more.
 const CLIP_MS = 60000;      // controller.yaml clock.clip_s
 const LEAD_MS = 6000;       // controller.yaml clock.audio_lead_s: the move is decided this long before it fires
-const WARMUP_MS = 600000;   // controller.yaml action_bias.baseline_warmup_s: no lean before this
+const WARMUP_MS = 120000;   // controller.yaml action_bias.baseline_warmup_s: no lean before this
 const SEEN_AT = 0.5;        // studio.yaml actions.count_min: a phone score this high counts as a phone
 const REPEAT_MS = 10000;    // the same kind of sighting is not announced again within this long
 const SAME_ID_MS = 60000;   // nor the same person for the same thing within this long

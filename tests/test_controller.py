@@ -373,3 +373,40 @@ def test_full_size_pictures_are_found_across_two_folders(tmp_path):
                                     "^([a-z][0-9][a-z][0-9])_", {}, "*_GIMM_25_raw_prob4.mov")
     assert set(found) == {"h2h3", "a2f2"} and not complaints   # resized copies and small clips are passed over
 
+
+
+def test_a_climb_keeps_its_arm_unless_an_action_turns_it():
+    """Seen live on 25 Nov 2026: with the bandit redrawing every minute, a
+    climb to Ring 3 wandered u1, h1, h2, f2, c2, c3. The arm chosen when a
+    climb begins is now kept until the ring is reached."""
+    for seed in range(20):
+        c = make_controller(pool=pool_288(), arm_chooser="bandit")
+        c.rng.seed(seed)
+        c.bandit.rng = c.rng
+        c.observe(crowd(59.0, 1))
+        step(c, 60.0)                       # out of Barren onto some arm, ring 1
+        arms, t = set(), 120.0
+        while node_ring(c.displayed) < 3:
+            c.observe(crowd(t - 1.0, 3))
+            d = step(c, t)
+            arms.add(d["to"][0])
+            t += 60.0
+            assert t < 600.0
+        assert len(arms) == 1, (seed, arms)
+    # A visitor's action that wins the draw may turn the climb.
+    c = make_controller(pool=pool_288(), arm_chooser="bandit")
+    c.observe(crowd(59.0, 1))
+    step(c, 60.0)
+    other = next(n for n in c.bandit.arms if n[0] != c.displayed[0])
+    order = [other] + [n for n in c.bandit.arms if n != other]
+    c.bandit.rank = lambda context, bias: (order, "action_bias")
+    c.observe(crowd(119.0, 3))
+    d = step(c, 120.0)
+    assert d["to"] == other[0] + "1"    # sideways onto the new arm first, then up it
+    t = 180.0
+    while node_ring(c.displayed) < 3:
+        c.observe(crowd(t - 1.0, 3))
+        step(c, t)
+        t += 60.0
+        assert t < 600.0
+    assert c.displayed == other[0] + "3"

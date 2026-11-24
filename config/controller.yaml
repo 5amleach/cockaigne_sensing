@@ -50,7 +50,7 @@ action_bias:
   lean_cap: 0.7         # the final lean per arm never exceeds this share of a Thompson draw (0..1); was 0.5,
                         # raised 25 Nov 2026 so a seen action usually wins: about 4 in 5 on a flat day
   rate_cap: 5.0         # a reported action rate above this is treated as this
-  baseline_warmup_s: 600  # rates are treated as normal (1.0) until this much crowd history exists
+  baseline_warmup_s: 120  # rates are treated as normal (1.0) until this much crowd history exists; was 600, cut 25 Nov 2026 (Sam)
   targets: {sitting: furniture, phone: machinery, drink: rivers, eat: feast}
   weights: {sitting: 1.0, phone: 1.0, drink: 1.0, eat: 1.0}   # 1.0 from 25 Nov 2026 (was 0.25): any excess reaches the cap fast
   sitting_baseline_s: 600    # sitting has no rate in Contract 2, so the controller keeps its own baseline
