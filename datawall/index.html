@@ -586,6 +586,7 @@ const LEAD_MS = 6000;       // controller.yaml clock.audio_lead_s: the move is d
 const WARMUP_MS = 600000;   // controller.yaml action_bias.baseline_warmup_s: no lean before this
 const SEEN_AT = 0.5;        // studio.yaml actions.count_min: a phone score this high counts as a phone
 const REPEAT_MS = 10000;    // the same kind of sighting is not announced again within this long
+const SAME_ID_MS = 60000;   // nor the same person for the same thing within this long
 const ARMS = { a: 'architecture', u: 'furniture', s: 'storm', r: 'rivers',
                f: 'feast', h: 'herd', m: 'machinery', c: 'cargo' };   // controller.yaml map.arms
 const SENSES = {
@@ -599,6 +600,7 @@ const talk = {
   doing: { phone: new Set(), sitting: new Set() },   // ids seen doing each thing in the last people message
   sightings: [],                       // {action, id, at}, not yet weighed in a move
   saidAt: { phone: 0, sitting: 0 },
+  saidId: { phone: new Map(), sitting: new Map() },   // id -> when that person was last announced
   firstDecisionAt: 0, lastFireAt: 0,
 };
 const mmss = (ms) => { const s = Math.max(0, Math.ceil(ms / 1000)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
@@ -628,7 +630,10 @@ function noteSightings(msg) {
     for (const id of ids) {
       if (talk.doing[action].has(id)) continue;
       talk.sightings.push({ action, id, at: now });
-      if (now - talk.saidAt[action] < REPEAT_MS) continue;
+      // A seated person who shifts reads as walking for a second, then sitting again: say it once.
+      const sameIdAt = talk.saidId[action].get(id) || 0;
+      if (now - talk.saidAt[action] < REPEAT_MS || now - sameIdAt < SAME_ID_MS) continue;
+      talk.saidId[action].set(id, now);
       talk.saidAt[action] = now;
       const fire = nextOpenFire(now);
       talk.first = sense.sighted(id);
