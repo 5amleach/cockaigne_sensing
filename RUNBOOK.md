@@ -61,6 +61,21 @@ The desktop shortcut **Cockaigne START** runs `start_studio.ps1` in the repo fol
 
 If a step cannot be done, the start window stays open and says why in red. The two program windows also stay open if their program stops, so the last lines can be read. **Cockaigne STOP**, or Ctrl+Alt+S from anywhere, closes the sensing chain, the controller and Resolume, which also takes a full-screen picture off the monitors. (`start_studio.ps1 -Stop` without `-All` leaves Resolume open.) Both close the data wall too. The wall runs in its own Edge, with its own profile in the git-ignored folder `.edge-wall`, so Sam's own Edge windows are never closed and can stay open while the wall starts. That Edge is started signed out of any account, with no extensions, no sync and no session restore, so nothing but the wall page can appear on the data screen. Resolume remembers its full-screen output, so once Output > Fullscreen has been chosen on a set of screens, every later start comes up full size. The shortcut icons are in `desktop/`. The paths to Resolume, the composition and Edge are at the top of `start_studio.ps1`.
 
+## Experiment 29 install: one camera, set up in the room
+
+START uses `config/studio.yaml` and camera cam1 (192.168.1.101). The phone sense is on (`actions.live: true`). It needs Ollama, which starts with Windows. Do these steps once the camera is mounted and the screens are in place. They take about half an hour.
+
+1. **Mount the camera so it faces the visitors.** Put it high, at the screen end of the room, looking out over the floor. A phone is only seen from the front, so a camera behind the visitors can't spot phones. Tilt it down until the floor right up to the far wall is in the picture.
+2. **Measure the floor the camera covers.** Measure it as a rectangle: x runs across the room, and y runs away from the camera, with y = 0 under the camera. Put the two numbers in `floor:` in `config/studio.yaml`. Put the spot where visitors stand to watch in `cohesion: proxy_spot_x_m` and `proxy_spot_y_m`, and the same two numbers in `$wallSpot` near the top of `start_studio.ps1`.
+3. **Take a gridded still:** `python -m cockaigne_sensing.tools.frame_grid rtsp://admin:PASSWORD@192.168.1.101:554/h264Preview_01_sub --out grid.png --step 50`. Read two things off it, in pixels of the 640 x 360 picture:
+    - the point where the far wall meets the floor, in the middle of the picture;
+    - the corners of the floor where visitors can stand. Leave the monitors and the projector screen outside these corners.
+4. **Walk about for two minutes** while the camera records boxes: `python -m cockaigne_sensing.tools.bench_detect rtsp://admin:PASSWORD@192.168.1.101:554/h264Preview_01_sub --camera cam1 --out bench/e29 --seconds 120`. Cover the whole floor, standing still now and then.
+5. **Calibrate:** copy `config/homography_cam1.json` somewhere safe first, then run `python -m cockaigne_sensing.tools.calibrate_auto bench/e29/tracks.jsonl --camera cam1 --facing into_u --far-wall-centre U V --config config/studio.yaml`, with U V from step 3.
+6. **Leave the screens out:** put the floor corners from step 3 in `floor_polygon:` under cam1 in `config/studio.yaml`, for example `[[40, 350], [600, 350], [520, 140], [120, 140]]`. Feet outside that outline are ignored, so figures on the monitors and projector are never counted.
+7. **Check it:** double-click START, then run `python -m cockaigne_sensing.tools.watch_bus` in a terminal. With the screens playing and nobody in the room, it should read n=0. One person walking in should read n=1, and two should read n=2. Hold a phone up facing the camera for a few seconds, and Tech adoption on the data wall should rise above 0.
+8. **Delete `bench/e29`.** `bench_detect` saved snapshots of whoever walked about.
+
 ## Choosing the actions model: the scripted session
 
 Before the first run, switch on HTTP in the camera's port settings, put tape on the floor at three marks, and have a phone, a cup and something to eat within reach.
