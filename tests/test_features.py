@@ -188,15 +188,16 @@ def test_mood_is_written_into_each_person():
 def test_mood_label_holds_for_the_dwell_time():
     cfg = load()
     scorer = PersonScorer(cfg)
+    dwell = cfg["mood"]["label_dwell_s"]
     labels = {}
     t = 0.0
-    while t <= 14.0:
-        box_h = 600 if t < 6.0 else 390  # a sudden slump at t = 6
+    while t <= dwell + 2.0:
+        box_h = 600 if t < 1.0 else 390  # a sudden slump at t = 1
         labels[round(t, 1)] = scorer.update(msg(t, [person(1, 2, 2, box_h=box_h)]))[1]
         t += 0.5
     assert labels[0.0] == "happy"
-    assert labels[7.5] == "happy"   # slumped, but the dwell holds the label
-    assert labels[14.0] == "sad"    # dwell elapsed, label follows
+    assert labels[round(dwell - 0.5, 1)] == "happy"  # slumped, but the dwell holds the label
+    assert labels[round(dwell + 2.0, 1)] == "sad"    # dwell elapsed, label follows
 
 
 def test_still_person_with_jitter_keeps_straightness_1():
