@@ -82,8 +82,8 @@ class ActionBias:
     rate is treated as 1.0 (no excess) until baseline_warmup_s of crowd
     history has been seen, because a baseline built on seconds of data makes
     the first sitter look like a stampede. The final lean per arm is capped
-    at lean_cap, half a Thompson draw, so it leans and can never select by
-    itself. Sitting has no rate in Contract 2, so a baseline for the sitting
+    at lean_cap, a fraction of a Thompson draw (which runs 0 to 1), so it
+    leans and can never select by itself. Sitting has no rate in Contract 2, so a baseline for the sitting
     fraction is kept here, the way sensing keeps the others.
     """
 

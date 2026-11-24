@@ -135,7 +135,7 @@ actions:
   baseline_window_s: 600  # window for each action's running baseline rate
   count_min: 0.5          # an action score at or above this counts the person as doing it
   rate_window_s: 60       # the "current rate" in action_rates is averaged over this window
-  baseline_floor: 0.02    # the baseline rate is never below this, so a first action in a quiet room reads as a spike, not infinity
+  baseline_floor: 0.005   # the baseline rate is never below this, so a first action in a quiet room reads as a spike, not infinity; 0.005 from 25 Nov 2026 (was 0.02) so one phone in a crowd of 20 still reads as above normal
 
 bus:
   host: 127.0.0.1

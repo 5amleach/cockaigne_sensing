@@ -37,7 +37,9 @@ controller:
 
 occupancy:
   bands: [[1, solo], [2, small], [6, medium], [16, large]]  # lower edge of each band, by n_smooth from the crowd state
-  band_size: {solo: 1, small: 3, medium: 10, large: 20}     # a typical headcount per band; divides the action bias
+  band_size: {solo: 1, small: 1, medium: 1, large: 1}       # divides the action bias per band; all 1 from 25 Nov 2026
+                                                            # so one person's phone still counts in a crowd (Sam: "tilt the
+                                                            # odds harder"); was {solo: 1, small: 3, medium: 10, large: 20}
 
 bandit:
   reward_delay_s: 10.0  # reward is the cohesion_smooth change from this long after clip start to clip end
@@ -45,11 +47,12 @@ bandit:
 
 action_bias:
   half_life_s: 90       # the lean decays with this half-life on the controller's clock
-  lean_cap: 0.5         # the final lean per arm can never exceed half a Thompson draw
+  lean_cap: 0.7         # the final lean per arm never exceeds this share of a Thompson draw (0..1); was 0.5,
+                        # raised 25 Nov 2026 so a seen action usually wins: about 4 in 5 on a flat day
   rate_cap: 5.0         # a reported action rate above this is treated as this
   baseline_warmup_s: 600  # rates are treated as normal (1.0) until this much crowd history exists
   targets: {sitting: furniture, phone: machinery, drink: rivers, eat: feast}
-  weights: {sitting: 0.25, phone: 0.25, drink: 0.25, eat: 0.25}   # starting guesses, tune on site
+  weights: {sitting: 1.0, phone: 1.0, drink: 1.0, eat: 1.0}   # 1.0 from 25 Nov 2026 (was 0.25): any excess reaches the cap fast
   sitting_baseline_s: 600    # sitting has no rate in Contract 2, so the controller keeps its own baseline
   sitting_baseline_floor: 0.02  # the baseline is never below this, so a first sitter reads as a spike, not infinity
 
