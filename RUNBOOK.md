@@ -76,6 +76,10 @@ START uses `config/studio.yaml` and camera cam1 (192.168.1.101). The phone sense
 7. **Check it:** double-click START, then run `python -m cockaigne_sensing.tools.watch_bus` in a terminal. With the screens playing and nobody in the room, it should read n=0. One person walking in should read n=1, and two should read n=2. Hold a phone up facing the camera for a few seconds, and Tech adoption on the data wall should rise above 0.
 8. **Delete `bench/e29`.** `bench_detect` saved snapshots of whoever walked about.
 
+### Test footage on tuning days
+
+`record_cam.ps1` in PowerShell saves cam1's main and sub streams to `D:\cockaigne recordings\<date>` in 10-minute `.mkv` files; `record_cam.ps1 -Stop` stops it. It copies the stream without decoding, so it runs beside the live show. Main is about 3.3 GB an hour, so a 7-hour day is about 25 GB. It is for tuning days only: the exhibition records nothing, and the files stay on this PC.
+
 ## Choosing the actions model: the scripted session
 
 Before the first run, switch on HTTP in the camera's port settings, put tape on the floor at three marks, and have a phone, a cup and something to eat within reach.

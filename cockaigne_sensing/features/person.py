@@ -22,11 +22,18 @@ def _clamp(v: float, lo: float, hi: float) -> float:
     return max(lo, min(hi, v))
 
 
+def _spread(values: list) -> float:
+    """Standard deviation: how far the values typically sit from their average."""
+    m = sum(values) / len(values)
+    return math.sqrt(sum((v - m) ** 2 for v in values) / len(values))
+
+
 @dataclass
 class _PersonState:
     """What the scorer remembers about one person between messages."""
     path: list = field(default_factory=list)    # (t, x, y) over the straightness window
     accels: list = field(default_factory=list)  # (t, acceleration) over the roughness window
+    body: list = field(default_factory=list)    # (t, box height, box width) over the body window
     v_prev: tuple | None = None                 # (t, vx, vy) from the previous message
     ref_h: float = 0.0                          # standing-height reference in pixels, a decaying maximum
     stopped_since: float | None = None          # when the person last came to a stop
@@ -58,7 +65,7 @@ class PersonScorer:
             st = self.states.setdefault(p["id"], _PersonState())
             self._track(st, t, p)
             p["posture"] = self._posture(st, t, p)
-            p["arousal"] = round(self._arousal(p), 2)
+            p["arousal"] = round(self._arousal(st, p), 2)
             p["valence"] = round(self._valence(st, p), 2)
             labels[p["id"]] = p["mood"] = self._mood(st, t, p)
         for pid in [pid for pid, st in self.states.items()
@@ -83,6 +90,11 @@ class PersonScorer:
                 st.accels.append((t, accel))
         st.v_prev = (t, p["vx"], p["vy"])
         st.accels = [a for a in st.accels if t - a[0] <= self.cfg["accel_window_s"]]
+        # The rectangle's size, only when the person was actually seen this
+        # step: a coasting person keeps an old rectangle that says nothing.
+        if p.get("view"):
+            st.body.append((t, float(p["box_h"]), p["box_ratio"] * p["box_h"]))
+        st.body = [b for b in st.body if t - b[0] <= self.cfg["body_window_s"]]
         # The standing-height reference: a maximum that decays toward the
         # current height, so a walk toward or away from the camera washes out
         # rather than reading as a permanent slump or stretch.
@@ -106,11 +118,27 @@ class PersonScorer:
             return "sitting"
         return "standing"
 
-    def _arousal(self, p: dict) -> float:
-        """From speed alone for now; acceleration and bounce join once there is
-        footage from the final camera height to tune against."""
+    def _arousal(self, st: _PersonState, p: dict) -> float:
+        """The larger of two energies: walking speed, and body movement on the spot.
+
+        Body movement is how much the person's rectangle grows and shrinks over
+        the last few seconds. Bouncing changes its height; waving arms changes
+        its width. Someone dancing in one place is energetic, not calm.
+        """
         speed = math.hypot(p["vx"], p["vy"])
-        return _clamp(speed / self.cfg["arousal_speed_full_mps"], 0.0, 1.0)
+        walking = speed / self.cfg["arousal_speed_full_mps"]
+        return _clamp(max(walking, self._body_motion(st) / self.cfg["arousal_body_full"]), 0.0, 1.0)
+
+    def _body_motion(self, st: _PersonState) -> float:
+        """Spread of the rectangle's height and width, as a fraction of its height."""
+        if len(st.body) < 5:
+            return 0.0
+        hs = [b[1] for b in st.body]
+        ws = [b[2] for b in st.body]
+        mean_h = sum(hs) / len(hs)
+        if mean_h <= 0:
+            return 0.0
+        return (_spread(hs) + _spread(ws)) / mean_h
 
     def _valence(self, st: _PersonState, p: dict) -> float:
         """Slumped and jerky reads negative; upright and smooth reads positive."""
@@ -132,6 +160,13 @@ class PersonScorer:
         walked = sum(math.hypot(x1 - x0, y1 - y0)
                      for (_, x0, y0), (_, x1, y1) in zip(pts, pts[1:]))
         if walked < self.cfg["straightness_min_path_m"]:
+            return 1.0
+        # Someone who has stayed within a small circle has not wandered, however
+        # much their position wobbled: bouncing or swaying on the spot is not
+        # aimless drifting.
+        cx = sum(x for _, x, _ in pts) / len(pts)
+        cy = sum(y for _, _, y in pts) / len(pts)
+        if max(math.hypot(x - cx, y - cy) for _, x, y in pts) < self.cfg["wander_min_radius_m"]:
             return 1.0
         direct = math.hypot(pts[-1][1] - pts[0][1], pts[-1][2] - pts[0][2])
         return min(1.0, direct / walked)

@@ -214,6 +214,23 @@ def test_still_person_with_jitter_keeps_straightness_1():
     assert scorer._straightness(scorer.states[1]) == 1.0
 
 
+def test_bouncing_on_the_spot_is_energetic_not_wandering():
+    # A person bouncing and waving in one place: position wobbles 30 cm, the
+    # rectangle's height and width swing. That is energy, not boredom.
+    cfg = load()
+    scorer = PersonScorer(cfg)
+    for i in range(301):  # 30 s at 10 Hz
+        t = i * 0.1
+        wobble = math.sin(t * 6.0)
+        p = person(1, SPOT[0] + 0.3 * wobble, SPOT[1], age=t,
+                   box_h=600 + 40 * wobble, box_ratio=0.4 + 0.15 * abs(wobble))
+        p["view"] = {"camera": "cam1", "box": [0, 0, 1, 1]}
+        out = scorer.update(msg(t, [p]))
+    assert scorer._straightness(scorer.states[1]) == 1.0
+    assert p["arousal"] > cfg["mood"]["bored_arousal_max"]
+    assert out[1] != "bored"
+
+
 def test_run_entry_point_writes_both_streams(tmp_path):
     import json
     import subprocess

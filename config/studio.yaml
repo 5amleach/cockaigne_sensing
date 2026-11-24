@@ -93,7 +93,10 @@ mood:
   label_dwell_s: 8.0      # a person's mood label holds at least this long before it can change
   sitting_ratio: 0.75     # box width / height above this, while stopped, reads as sitting
   sitting_still_s: 2.0    # how long a person must have been stopped before sitting is read
-  arousal_speed_full_mps: 1.2  # walking at this speed scores arousal 1.0; arousal is from speed alone for now
+  arousal_speed_full_mps: 1.2  # walking at this speed scores arousal 1.0
+  body_window_s: 3.0      # bouncing and arm movement are judged over this window
+  arousal_body_full: 0.15 # the rectangle's height and width wobbling by this fraction of its height scores arousal 1.0
+  wander_min_radius_m: 0.75  # someone who stays within this distance of one spot is never read as wandering
   accel_window_s: 2.0     # movement roughness is averaged over this window
   valence_ref_s: 20.0     # the standing-height reference decays over about this long
   valence_slump_neutral: 0.15  # slump below this fraction of standing height reads neutral
