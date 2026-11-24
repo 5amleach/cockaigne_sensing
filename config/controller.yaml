@@ -71,9 +71,8 @@ sound:
   # sound file into the clip's own column on the sound layers. Run it once per composition.
   folder: C:/cockaigne e29/sound       # searched with its subfolders for *.wav
   name_pattern: "_([a-z][0-9][a-z][0-9])_au"   # where the clip name sits in a sound file's name
-  renames:                             # files delivered under another clip's name: path ending -> true clip
-    "level 3 herd/level 3_f3u3_au.wav": h3a3      # to be confirmed by Karl
-    "level 4 machine/level 4_h4u4_au.wav": m4a4   # to be confirmed by Karl
+  renames: {}                          # files delivered under another clip's name: path ending -> true clip.
+                                       # Empty since 24 Nov 2026: every clip has a file under its own name.
   play_mode: "Play Once & Clear"       # a sound plays through once and frees its layer
 
 picture:
