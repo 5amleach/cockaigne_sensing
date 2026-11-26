@@ -5,8 +5,8 @@
 # chain and the controller cleanly, and leaves Resolume as it is.
 #   -Stop     closes the sensing chain, the controller and the data wall, and nothing else.
 #   -Stop -All  closes Resolume as well, which takes its full-screen picture
-#             off the monitors. The Cockaigne STOP shortcut does this, and its
-#             key (Ctrl+Alt+S) works even when the picture covers the desktop.
+#             off the monitors. The Cockaigne STOP shortcut does this, and so
+#             does Ctrl+Alt+S, which stop_hotkey.ps1 listens for while the show runs.
 #   -NoWall   does not open the data wall page.
 #   -Composition name   opens that composition instead of the usual one.
 #
@@ -57,6 +57,20 @@ function Stop-Ours {
     foreach ($p in $ours) { Stop-Process -Id $p.ProcessId -Force -ErrorAction SilentlyContinue }
     if ($ours) { Start-Sleep -Seconds 2 }
     return @($ours).Count
+}
+
+function Stop-Hotkey {
+    # The hidden program that waits for Ctrl+Alt+S (stop_hotkey.ps1).
+    $keys = Get-CimInstance Win32_Process -Filter "Name = 'powershell.exe'" |
+        Where-Object { $_.CommandLine -like "*stop_hotkey.ps1*" }
+    foreach ($p in $keys) { Stop-Process -Id $p.ProcessId -Force -ErrorAction SilentlyContinue }
+}
+
+function Start-Hotkey {
+    # One stop key at a time: an earlier one is closed first.
+    Stop-Hotkey
+    Start-Process powershell.exe -WindowStyle Hidden -WorkingDirectory $repo -ArgumentList "-NoProfile",
+        "-ExecutionPolicy", "Bypass", "-File", "`"$(Join-Path $repo 'stop_hotkey.ps1')`""
 }
 
 function Port-Open($port) {
@@ -112,6 +126,7 @@ Set-Location $repo
 if ($Stop) {
     $n = Stop-Ours
     Stop-Wall
+    Stop-Hotkey
     if ($All) {
         Get-Process Avenue, Arena -ErrorAction SilentlyContinue | Stop-Process -Force
         Say "Stopped the sensing chain, the controller ($n processes), the data wall and Resolume." "Green"
@@ -130,6 +145,8 @@ if (-not (Test-Path $python)) { Fail "Python is missing at $python" }
 if (-not (Test-Path (Join-Path $repo "camera_password.txt")) -and -not $env:COCKAIGNE_RTSP_PASSWORD) {
     Fail "No camera password. Set COCKAIGNE_RTSP_PASSWORD or write camera_password.txt (RUNBOOK.md)."
 }
+# The stop key goes on first, so Ctrl+Alt+S works even if a later step fails.
+Start-Hotkey
 
 # 2. Resolume, with the Cockaigne composition loaded.
 if (-not (Get-Process Avenue, Arena -ErrorAction SilentlyContinue)) {
