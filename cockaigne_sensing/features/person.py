@@ -1,7 +1,8 @@
 """Per-person posture, arousal, valence and a mood label, from the track alone.
 
 Everything here is arithmetic on one person's position, velocity and rectangle
-shape. No pictures and no models. The thresholds live in config/sensing.yaml
+shape. No pictures and no models. The one exception is the mood label, which
+also reads the action sense's answer for folded arms or hands on hips. The thresholds live in config/sensing.yaml
 under mood: and are starting guesses; they are to be tuned on site against
 footage from the final camera height, and the labels are provisional until
 then (DECISIONS.md, 2026-10-05).
@@ -53,6 +54,7 @@ class PersonScorer:
     def __init__(self, cfg: dict):
         self.cfg = cfg["mood"]
         self.still = cfg["cohesion"]["still_speed_mps"]
+        self.count_min = cfg["actions"]["count_min"]
         # Forget a person a while after the floor tracker itself would have
         # dropped them; derived, not a separate tunable.
         self.forget_after_s = 2.0 * cfg["floor_tracker"]["drop_after_s"] + 10.0
@@ -175,7 +177,13 @@ class PersonScorer:
         """Happy, sad, bored or annoyed, held for label_dwell_s so it cannot flicker."""
         c = self.cfg
         straightness = self._straightness(st)
-        if p["valence"] <= c["sad_valence"]:
+        # Arms folded or hands on hips, as the action sense reads them, outrank
+        # the arithmetic: a closed stance reads bored, or annoyed when energetic.
+        closed = any(p.get("actions", {}).get(a, 0.0) >= self.count_min
+                     for a in c["closed_postures"])
+        if closed:
+            candidate = "annoyed" if p["arousal"] >= c["annoyed_arousal"] else "bored"
+        elif p["valence"] <= c["sad_valence"]:
             candidate = "annoyed" if p["arousal"] >= c["annoyed_arousal"] else "sad"
         elif straightness < c["bored_straightness"] and p["arousal"] < c["bored_arousal_max"]:
             candidate = "bored"

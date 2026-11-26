@@ -180,6 +180,23 @@ def test_a_silent_model_turns_the_sense_blind_and_scores_fade(caplog):
     assert any("not answering" in r.message for r in caplog.records)
 
 
+def test_a_model_not_yet_answering_is_given_time_to_load():
+    # Ollama abandons a load when the asker hangs up, so until the model has
+    # answered, questions wait load_timeout_s rather than request_timeout_s.
+    class Timed(FakeModel):
+        def ask(self, crop, timeout_s=None):
+            self.timeouts.append(timeout_s)
+            return super().ask(crop)
+    clock = Clock()
+    model = Timed(["none"])
+    model.timeouts = []
+    worker = make_worker(model, clock, load_timeout_s=120.0)
+    worker.step()                       # empty room: the first blank question
+    clock.sleep(20.0)
+    worker.step()                       # answered before, so the usual wait
+    assert model.timeouts == [120.0, None]
+
+
 def test_no_picture_means_no_question_and_no_tight_loop():
     clock = Clock()
     model = FakeModel(["phone"])

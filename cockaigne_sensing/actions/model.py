@@ -53,8 +53,10 @@ class OllamaModel:
             self.body["think"] = False   # some models reason aloud first unless told not to
         self.question = QUESTION.format(words=", ".join(self.words))
 
-    def ask(self, crop: np.ndarray) -> str | None:
-        """The model's one-word answer for this crop, or None for no answer."""
+    def ask(self, crop: np.ndarray, timeout_s: float | None = None) -> str | None:
+        """The model's one-word answer for this crop, or None for no answer.
+        timeout_s overrides request_timeout_s; the worker passes a long one
+        while the model may still be loading (see load_timeout_s)."""
         ok, jpeg = cv2.imencode(".jpg", crop, [cv2.IMWRITE_JPEG_QUALITY, 90])
         if not ok:
             return None
@@ -62,7 +64,7 @@ class OllamaModel:
                    "images": [base64.b64encode(jpeg.tobytes()).decode("ascii")]}
         try:
             reply = requests.post(self.url, json=dict(self.body, messages=[message]),
-                                  timeout=self.timeout_s)
+                                  timeout=timeout_s or self.timeout_s)
             reply.raise_for_status()
             word = json.loads(reply.json()["message"]["content"])["answer"]
         except (requests.RequestException, ValueError, KeyError, TypeError):
@@ -78,7 +80,7 @@ class FakeModel:
         self.words = words or ["none"]
         self.asked = 0
 
-    def ask(self, crop: np.ndarray) -> str | None:
+    def ask(self, crop: np.ndarray, timeout_s: float | None = None) -> str | None:
         word = self.words[self.asked % len(self.words)]
         self.asked += 1
         return word

@@ -140,7 +140,12 @@ class ActionsWorker(threading.Thread):
         if wait > 0:
             self.sleep(wait)
         self._next_ask = self.clock() + 1.0 / self.cfg["max_asks_per_s"]
-        word = self.model.ask(crop)
+        # While the model is not answering it may be loading onto the graphics
+        # card, which can take a minute. Ollama abandons a load when the asker
+        # hangs up, so a short wait here would abandon it every time and the
+        # sense would never see (found 27 Nov 2026). Wait long enough instead.
+        alive = self.health(self.clock())["alive"]
+        word = self.model.ask(crop, None if alive else self.cfg["load_timeout_s"])
         self.asked += 1
         t = self.clock()
         if word is not None:

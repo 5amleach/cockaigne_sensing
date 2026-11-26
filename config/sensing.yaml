@@ -109,6 +109,7 @@ mood:
   happy_valence: 0.1      # valence above this reads happy
   sad_valence: -0.1       # valence below this reads sad, or annoyed when arousal is high
   annoyed_arousal: 0.6    # negative valence with arousal at or above this reads annoyed
+  closed_postures: [arms_folded, hands_on_hips]  # action-sense words that read bored, or annoyed when arousal is at annoyed_arousal; only seen when listed in actions.enabled (27 Nov 2026, Sam)
 
 actions:
   live: false             # whether the live launcher runs the action sense at all; false until a model has been chosen on the bench
@@ -127,6 +128,7 @@ actions:
   crop_max_px: 448        # the crop is shrunk so its longer side is at most this many pixels; smaller is answered faster
   still_timeout_s: 3.0    # how long to wait for a camera's still picture
   request_timeout_s: 5.0  # how long to wait for the model's answer
+  load_timeout_s: 120.0   # how long to wait while the model is not answering yet, since it may be loading; a shorter wait makes Ollama abandon the load (27 Nov 2026)
   heartbeat_s: 10.0       # with nobody to ask about, a blank question this often proves the model is alive and keeps it loaded
   fail_warn_s: 30.0       # with no answer for this long the sense is reported blind, and a warning is logged this often
   idle_s: 0.2             # how long the worker rests when nobody is due

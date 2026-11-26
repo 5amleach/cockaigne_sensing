@@ -200,6 +200,17 @@ def test_mood_label_holds_for_the_dwell_time():
     assert labels[round(dwell + 2.0, 1)] == "sad"    # dwell elapsed, label follows
 
 
+def test_folded_arms_or_hands_on_hips_read_bored():
+    # The action sense's answer for a closed stance outranks the arithmetic.
+    scorer = PersonScorer(load())
+    first = person(1, 2, 2)
+    assert scorer.update(msg(0.0, [first]))[1] == "happy"
+    for pose in ("arms_folded", "hands_on_hips"):
+        scorer = PersonScorer(load())
+        p = dict(person(1, 2, 2), actions={"phone": 0.0, pose: 1.0})
+        assert scorer.update(msg(0.0, [p]))[1] == "bored"
+
+
 def test_still_person_with_jitter_keeps_straightness_1():
     # Three centimetres of position jitter must not add up to a walked path:
     # a person standing still on the spot is not "bored".
