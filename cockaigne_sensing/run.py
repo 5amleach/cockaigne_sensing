@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import json
 import logging
 import queue
 import time
@@ -101,6 +102,10 @@ class Launcher:
             out = Path(self.record_dir)
             recorders = {s: Recorder(out / f"{s}.jsonl")
                          for s in ("tracks", "people", "crowd")}
+            # Message times count seconds since the PC started. This pair of
+            # readings turns them into clock time, to line them up with video.
+            (out / "clock.json").write_text(json.dumps(
+                {"t": time.monotonic(), "wall": time.strftime("%Y-%m-%dT%H:%M:%S%z")}))
 
         frames_cfg = cfg["launcher"].get("frames", {})
         frame_server = None

@@ -7,13 +7,17 @@
 #   -Stop -All  closes Resolume as well, which takes its full-screen picture
 #             off the monitors. The Cockaigne STOP shortcut does this, and so
 #             does Ctrl+Alt+S, which stop_hotkey.ps1 listens for while the show runs.
+#   -Record   also records cam1 and the sensing messages, for the test weekend
+#             only (record_cam.ps1). The "Cockaigne START + RECORD" shortcut does
+#             this. Without -Record any recording still running is stopped, and
+#             so it is by -Stop and Ctrl+Alt+S.
 #   -NoWall   does not open the data wall page.
 #   -Composition name   opens that composition instead of the usual one.
 #
 # Each of the two programs gets its own window, titled "Cockaigne sensing" and
 # "Cockaigne controller". The windows stay open if a program stops, so its
 # last words can be read. See RUNBOOK.md, "The studio shed, one double-click".
-param([switch]$Stop, [switch]$All, [switch]$NoWall, [string]$Composition = "cockaigne_e29_full")
+param([switch]$Stop, [switch]$All, [switch]$Record, [switch]$NoWall, [string]$Composition = "cockaigne_e29_full")
 
 $repo        = $PSScriptRoot
 $python      = Join-Path $repo ".venv\Scripts\python.exe"
@@ -38,12 +42,14 @@ $wallSpot    = "1.75,3.5"   # the viewing spot in config/studio.yaml, drawn on t
 $wallProfile = Join-Path $repo ".edge-wall"
 $restUrl     = "http://127.0.0.1:8080/api/v1/composition"
 $minClips    = 100          # layer 1 holds 288 clips; fewer than this means the composition is still loading
+$recorder    = Join-Path $repo "record_cam.ps1"
 
 function Say($text, $colour = "Gray") { Write-Host $text -ForegroundColor $colour }
 
 function Fail($text) {
     Say ""
     Say "COULD NOT START: $text" "Red"
+    & $recorder -Stop   # no recording is left running without a show
     Say ""
     Read-Host "Press Enter to close this window"
     exit 1
@@ -124,6 +130,7 @@ $Host.UI.RawUI.WindowTitle = "Cockaigne start"
 Set-Location $repo
 
 if ($Stop) {
+    & $recorder -Stop
     $n = Stop-Ours
     Stop-Wall
     Stop-Hotkey
@@ -170,8 +177,23 @@ Say "Resolume is ready: $clips clips on layer 1." "Green"
 # 3. A clean slate, then the sensing chain.
 $old = Stop-Ours
 if ($old) { Say "Closed an earlier run ($old processes)." }
+
+# Recording happens only with -Record. A recording that cannot start is
+# reported in red and the show starts anyway, unrecorded.
+& $recorder -Stop
+$sensingRecord = ""; $controllerRecord = ""
+if ($Record) {
+    $recDir = Join-Path "D:\cockaigne recordings" (Get-Date -Format "yyyy-MM-dd")
+    & $recorder -Dir $recDir
+    if ($LASTEXITCODE -eq 0) {
+        $messages = Join-Path $recDir ("messages_" + (Get-Date -Format "HHmmss"))
+        $sensingRecord = " --record `"$messages`""
+        $controllerRecord = "--record `"$messages\decision.jsonl`""
+    }
+}
+
 Say "Starting the sensing chain on the shed camera ..."
-Start-Window "Cockaigne sensing" "cockaigne_sensing.run" "--config $config"
+Start-Window "Cockaigne sensing" "cockaigne_sensing.run" "--config $config$sensingRecord"
 $up = $false
 foreach ($i in 1..60) { if (Port-Open 8765) { $up = $true; break }; Start-Sleep -Seconds 2 }
 if (-not $up) { Fail "The sensing chain did not open its bus on port 8765. Read the 'Cockaigne sensing' window." }
@@ -179,7 +201,7 @@ Say "Sensing is up. The camera takes about ten more seconds to settle." "Green"
 
 # 4. The controller, which fires its first clip at once.
 Say "Starting the controller ..."
-Start-Window "Cockaigne controller" "cockaigne_controller.run" ""
+Start-Window "Cockaigne controller" "cockaigne_controller.run" $controllerRecord
 Start-Sleep -Seconds 4
 
 # 5. The data wall.
@@ -194,4 +216,5 @@ if (-not $NoWall) {
 Say ""
 Say "Running. One clip fires each minute; walk into the shed and the ring climbs." "Cyan"
 Say "To stop: press Ctrl+Alt+S, or use the 'Cockaigne STOP' shortcut."
+if ($sensingRecord) { Say "RECORDING cam1 and the sensing messages. Stopping the show stops the recording too." "Yellow" }
 Start-Sleep -Seconds 12

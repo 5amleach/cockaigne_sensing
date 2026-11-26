@@ -78,7 +78,9 @@ START uses `config/studio.yaml` and camera cam1 (192.168.1.101). The phone sense
 
 ### Test footage on tuning days
 
-`record_cam.ps1` in PowerShell saves cam1's main and sub streams to `D:\cockaigne recordings\<date>` in 10-minute `.mkv` files; `record_cam.ps1 -Stop` stops it. It copies the stream without decoding, so it runs beside the live show. Main is about 3.3 GB an hour, so a 7-hour day is about 25 GB. It is for tuning days only: the exhibition records nothing, and the files stay on this PC.
+The **Cockaigne START + RECORD** desktop shortcut starts the show exactly as START does and also records. It runs `start_studio.ps1 -Record`, which calls `record_cam.ps1`. That saves cam1's main and sub streams to the T7 at `D:\cockaigne recordings\<date>` in 10-minute `.mkv` files, and the sensing and controller messages (headcount, cohesion, actions, ring, every clip chosen) to a `messages_<time>` folder beside them. `clock.json` in that folder turns the messages' times into clock time, to line them up with the video, whose file names carry the PC's clock time. The video is copied without decoding, so it runs beside the live show; the sensing reads its own copy of the sub stream. A hidden watcher restarts a stream within ten seconds if the camera drops it.
+
+STOP, Ctrl+Alt+S and the plain START all stop the recording. If recording cannot start (T7 unplugged, under 20 GB free, camera refusing), the START window says so in red and the show starts unrecorded. Main measured about 2 GB an hour on 27 Nov; allow up to 3.5 GB with a busy room. Recording is for the test weekend only: after the date in `record_cam.ps1` (29 Nov 2026) it refuses to record, so the exhibition records nothing, and the files stay on this PC.
 
 ## Choosing the actions model: the scripted session
 
@@ -159,4 +161,4 @@ The folders it searches are in `config/controller.yaml` under `picture`. A clip 
 - Fire not confirmed → one warning, one retry, the decision published marked unconfirmed, the wall's position held; the fire path never raises.
 - Missing clips → the controller refuses to start and names them.
 - Action model silent for 30 s → scores fade to zero, the health flag goes false, the wall shows "?", the log and the ledger say so; it recovers by itself.
-- The bus binds only to this machine; recording only happens with an explicit `--record`.
+- The bus binds only to this machine; recording only happens with an explicit `--record`, which only START + RECORD passes, and only up to 29 Nov 2026.

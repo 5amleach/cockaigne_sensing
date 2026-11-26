@@ -1,66 +1,93 @@
-# Record cam1 to disk in 10-minute files, for test footage only.
+# Record cam1 to disk in 10-minute files, for the test weekend only.
 #
 #   record_cam.ps1           start recording (main and sub streams)
 #   record_cam.ps1 -Stop     stop recording
 #
-# The exhibition itself records nothing. This is for tuning days only.
+# The usual way in is the "Cockaigne START + RECORD" desktop shortcut, which
+# runs "start_studio.ps1 -Record" and so calls this file. The plain START,
+# STOP and Ctrl+Alt+S all stop any recording. The exhibition records nothing:
+# after $lastDay below this file refuses to record at all, so a forgotten
+# shortcut cannot record in February.
+#
 # The video is copied straight from the camera without decoding, so it
-# barely loads the PC and runs beside the live show. Files go to
-# D:\cockaigne recordings\<date>, named like the Light Room footage:
-# cam1_main_20261127_101500.mkv. About 3.3 GB an hour for main, little for sub.
-# They stay on this PC and are never uploaded.
-param([switch]$Stop)
+# barely loads the PC and runs beside the live show; the sensing chain reads
+# its own copy of the sub stream (three streams at once were tried on 27 Nov).
+# Files go to the T7 at D:\cockaigne recordings\<date>, named like the Light
+# Room footage: cam1_main_20261127_171500.mkv. Main measured about 2 GB an
+# hour on 27 Nov (allow up to 3.5 GB with a busy room); sub is a few hundred MB.
+# A hidden watcher restarts a stream within ten seconds if the camera drops it.
+# The files stay on this PC and are never uploaded.
+#
+# Exit code 0 means recording is running; anything else means it is not.
+param([switch]$Stop, [switch]$Watch, [string]$Dir)
 
-$repo   = $PSScriptRoot
-$camera = "cam1"
-$ip     = "192.168.1.101"
-$user   = "admin"
-$root   = "D:\cockaigne recordings"
-$streams = @{ main = "h264Preview_01_main"; sub = "h264Preview_01_sub" }
+$lastDay = [datetime]"2026-11-29"    # the last day recording is allowed
+$minFreeGB = 20                      # do not start with less than this free on the T7
+$root    = "D:\cockaigne recordings"
+$ip      = "192.168.1.101"
+$user    = "admin"
+$streams = [ordered]@{ main = "h264Preview_01_main"; sub = "h264Preview_01_sub" }
+$self    = $MyInvocation.MyCommand.Path
 
-$Host.UI.RawUI.WindowTitle = "Cockaigne recorder"
-
-function Get-Recorders {
+function Get-Ffmpegs {
     Get-CimInstance Win32_Process -Filter "Name = 'ffmpeg.exe'" |
         Where-Object { $_.CommandLine -match [regex]::Escape($ip) }
 }
 
+function Get-Watchers {
+    Get-CimInstance Win32_Process -Filter "Name = 'powershell.exe'" |
+        Where-Object { $_.CommandLine -like "*record_cam.ps1*-Watch*" -and $_.ProcessId -ne $PID }
+}
+
 if ($Stop) {
-    $procs = @(Get-Recorders)
-    # A forced stop can leave the last file without its index; ffmpeg and
-    # the sensing tools still read such a file.
-    $procs | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }
-    Write-Host "Recording stopped ($($procs.Count) streams)." -ForegroundColor Green
-    Start-Sleep 3
-    return
+    # The watcher goes first, so it cannot restart the streams being stopped.
+    # A forced stop can leave the last file without its index; ffmpeg, VLC
+    # and the sensing tools still read such a file.
+    $w = @(Get-Watchers); $f = @(Get-Ffmpegs)
+    $w + $f | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+    if ($f.Count) { Write-Host "Recording stopped." -ForegroundColor Green }
+    exit 0
 }
 
-if (@(Get-Recorders).Count -gt 0) {
-    Write-Host "Already recording. Run record_cam.ps1 -Stop first." -ForegroundColor Yellow
-    Start-Sleep 5
-    return
+if ($Watch) {
+    # The hidden watcher: start each stream, and start it again whenever it ends.
+    $ffmpeg = (Get-Command ffmpeg).Source
+    $url = { param($path) "rtsp://${user}:$([uri]::EscapeDataString($env:COCKAIGNE_RTSP_PASSWORD))@${ip}:554/$path" }
+    while ($true) {
+        $running = (@(Get-Ffmpegs) | ForEach-Object { $_.CommandLine }) -join " "
+        foreach ($name in $streams.Keys) {
+            if ($running -match $streams[$name]) { continue }
+            $out = Join-Path $Dir "cam1_${name}_%Y%m%d_%H%M%S.mkv"
+            $a = "-hide_banner -loglevel error -rtsp_transport tcp -timeout 10000000 -i `"$(& $url $streams[$name])`" " +
+                 "-c copy -map 0:v -f segment -segment_time 600 -reset_timestamps 1 -strftime 1 `"$out`""
+            Start-Process $ffmpeg -ArgumentList $a -WindowStyle Hidden
+        }
+        Start-Sleep -Seconds 10
+    }
 }
 
-$pwFile = Join-Path $repo "camera_password.txt"
-if (Test-Path $pwFile) { $pw = (Get-Content $pwFile -TotalCount 1).Trim() }
-else { $pw = $env:COCKAIGNE_RTSP_PASSWORD }
-if (-not $pw) { Write-Host "No camera password (camera_password.txt)." -ForegroundColor Red; Start-Sleep 10; return }
+# Starting. Every check that fails says why and leaves the show alone.
+function No($text) { Write-Host "NOT RECORDING: $text" -ForegroundColor Red; exit 1 }
 
-$ffmpeg = (Get-Command ffmpeg -ErrorAction SilentlyContinue).Source
-if (-not $ffmpeg) { Write-Host "ffmpeg not found." -ForegroundColor Red; Start-Sleep 10; return }
+if ((Get-Date).Date -gt $lastDay) { No "recording was only for the test weekend, up to $($lastDay.ToString('d MMM yyyy'))." }
+if (-not $env:COCKAIGNE_RTSP_PASSWORD) { No "no camera password (COCKAIGNE_RTSP_PASSWORD)." }
+if (-not (Get-Command ffmpeg -ErrorAction SilentlyContinue)) { No "ffmpeg is not installed." }
+$t7 = Get-CimInstance Win32_LogicalDisk -Filter "DeviceID = 'D:'"
+if (-not $t7 -or -not $t7.Size) { No "the T7 drive (D:) is not plugged in." }
+$freeGB = [math]::Floor($t7.FreeSpace / 1GB)
+if ($freeGB -lt $minFreeGB) { No "only $freeGB GB free on the T7." }
 
-$dir = Join-Path $root (Get-Date -Format "yyyy-MM-dd")
-New-Item -ItemType Directory -Force $dir | Out-Null
-
-foreach ($name in $streams.Keys) {
-    $url = "rtsp://${user}:$([uri]::EscapeDataString($pw))@${ip}:554/$($streams[$name])"
-    $out = Join-Path $dir "${camera}_${name}_%Y%m%d_%H%M%S.mkv"
-    $args = "-hide_banner -loglevel error -rtsp_transport tcp -i `"$url`" -c copy -map 0:v " +
-            "-f segment -segment_time 600 -reset_timestamps 1 -strftime 1 `"$out`""
-    Start-Process $ffmpeg -ArgumentList $args -WindowStyle Hidden
+if (@(Get-Watchers).Count -eq 0) {
+    if (-not $Dir) { $Dir = Join-Path $root (Get-Date -Format "yyyy-MM-dd") }
+    New-Item -ItemType Directory -Force $Dir | Out-Null
+    Start-Process powershell.exe -WindowStyle Hidden -ArgumentList "-NoProfile", "-ExecutionPolicy", "Bypass",
+        "-File", "`"$self`"", "-Watch", "-Dir", "`"$Dir`""
 }
-Start-Sleep 4
-$n = @(Get-Recorders).Count
-if ($n -eq 2) { Write-Host "Recording cam1 to $dir" -ForegroundColor Green }
-else { Write-Host "Only $n of 2 streams started. Check the camera." -ForegroundColor Red }
-Start-Sleep 4
+foreach ($i in 1..10) { if (@(Get-Ffmpegs).Count -ge 2) { break }; Start-Sleep -Seconds 1 }
+Start-Sleep -Seconds 3   # a stream the camera refuses ends within a few seconds
+if (@(Get-Ffmpegs).Count -lt 2) {
+    & $self -Stop | Out-Null
+    No "the camera did not give both streams. Check that cam1 is on."
+}
+Write-Host "RECORDING cam1 to $Dir ($freeGB GB free, about 2 to 3.5 GB an hour)." -ForegroundColor Yellow
+exit 0
