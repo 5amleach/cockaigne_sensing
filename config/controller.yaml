@@ -87,3 +87,6 @@ picture:
   glob: "*_GIMM_25_raw_prob4.mov"      # which files count as full-size masters
   name_pattern: "^([a-z][0-9][a-z][0-9])_"     # the clip name starts the file name
   resize: Fit                          # the whole picture, in proportion, inside the composition
+  play_mode: "Play Once & Hold"        # set by `python -m cockaigne_controller.hold_pictures`: a clip that
+                                       # ends a moment before the next fire holds its last frame instead of
+                                       # looping back to its first (the frame-or-two flash, 27 Nov 2026)
