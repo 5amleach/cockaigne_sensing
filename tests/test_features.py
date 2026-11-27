@@ -50,6 +50,19 @@ def test_lone_viewer_is_capped_below_ring_4():
     assert crowds[-1]["ring_target"] == 3  # the proxies do carry them up
 
 
+def test_a_bored_room_does_not_climb_past_ring_2_and_a_higher_ring_holds():
+    # The same lone viewer, arms folded the whole time: bored, so Ring 2 at most.
+    stage = FeatureStage(load())
+    folded = lambda t: [dict(person(1, *SPOT, age=t), actions={"phone": 0.0, "arms_folded": 1.0})]
+    crowds = run_room(stage, folded, t1=600.0)
+    assert max(c["ring_target"] for c in crowds) == 2
+    # Reaching Ring 3 first and then folding arms holds Ring 3: no forced drop.
+    stage = FeatureStage(load())
+    run_room(stage, lambda t: [person(1, *SPOT, age=t)], t1=600.0)
+    crowds = run_room(stage, lambda t: folded(t + 600.0), t0=600.5, t1=700.0)
+    assert all(c["ring_target"] == 3 for c in crowds)
+
+
 def test_group_can_reach_ring_4():
     # Four people gathered at the spot, still, long dwell: relational evidence.
     stage = FeatureStage(load())

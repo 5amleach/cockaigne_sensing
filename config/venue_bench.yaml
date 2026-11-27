@@ -80,6 +80,8 @@ cohesion:
   - 0.3
   - 0.5
   - 0.74
+  bored_ring_cap: 2       # while bored_cap_share of the people present read bored, the ring may not climb past this; a higher ring already reached is held (Sam, 27 Nov 2026)
+  bored_cap_share: 0.5    # at least this share of the people present (a lone viewer counts as all of them)
 mood:
   # Everything in this section is a starting guess, to be tuned on site against
   # footage from the final camera height. Treat the labels as provisional until then.

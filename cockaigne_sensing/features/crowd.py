@@ -233,23 +233,23 @@ class CrowdState:
                 "coordination": coordination_score(stillness, synchrony),
                 "spare1": 1.0, "spare2": 1.0,
             }
-            # A set of one contains no disagreement; the blend weight keeps it
-            # from counting. The data wall shows the 100% and Population 1
-            # side by side on purpose.
+            # A set of one has no disagreement; the blend weight keeps it from
+            # counting. The data wall shows 100% and Population 1 side by side on purpose.
             relational = 1.0 if n == 1 else relational_cohesion(signals, c["signals"])
 
         proxy = proxy_score(people, c)
         w = interp_by_n(self.n_eff, c["blend_weight_by_n"])
-        # In the blend, relational evidence needs at least two people; the
-        # reported cohesion_relational above keeps saying 1.0 for one.
+        # In the blend, relational evidence needs two people; the reported value keeps 1.0 for one.
         raw = (1.0 - w) * proxy + w * (relational if n >= 2 else 0.0)
-        # The ceiling that keeps the top ring collective: 0.72 for one or two
-        # people, out of the way from four up.
+        # The ceiling that keeps the top ring collective: 0.72 for one or two, none from four up.
         raw = min(raw, interp_by_n(self.n_eff, c["score_ceiling_by_n"]))
 
         self.smooth += _alpha(dt, c["smooth_window_s"]) * (raw - self.smooth)
         level = self.reservoir.step(self.smooth, dt)
-        self.ring = ring_from_level(level, self.ring, c["ring_up"], c["ring_down"])
+        ring = ring_from_level(level, self.ring, c["ring_up"], c["ring_down"])
+        # A bored room may not climb past bored_ring_cap (Sam, 27 Nov 2026); a ring already higher is held, not dropped.
+        bored = n > 0 and sum(1 for m in labels.values() if m == "bored") >= c["bored_cap_share"] * n
+        self.ring = min(ring, max(self.ring, c["bored_ring_cap"])) if bored else ring
         self._update_action_rates(people, dt)
 
         if self._t_emit is not None and t - self._t_emit < c["crowd_interval_s"]:
