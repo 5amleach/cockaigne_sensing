@@ -52,12 +52,15 @@ class Bandit:
         self.beliefs = {(ctx, arm): Beta(*priors[arm])
                         for ctx in self.contexts for arm in self.arms}
 
-    def rank(self, context: str, bias: dict[str, float]) -> tuple[list[str], str]:
-        """One Thompson draw plus the lean, every arm in order of its total.
-        The reason is "action_bias" only when the lean changed the winner;
-        the runner-up serves the lateral move when the winner is the arm
-        the wall is already on."""
-        draws = {arm: self.beliefs[(context, arm)].sample(self.rng)
+    def rank(self, context: str, bias: dict[str, float],
+             hunger: dict[str, float] | None = None) -> tuple[list[str], str]:
+        """One Thompson draw plus the hunger and the lean, every arm in order
+        of its total. Hunger is part of the machine's own draw, so a win it
+        decides is reported as "bandit"; the reason is "action_bias" only
+        when the lean changed the winner. The runner-up serves the lateral
+        move when the winner is the arm the wall is already on."""
+        hunger = hunger or {}
+        draws = {arm: self.beliefs[(context, arm)].sample(self.rng) + hunger.get(arm, 0.0)
                  for arm in self.arms}
         plain = max(draws, key=draws.get)
         order = sorted(self.arms, key=lambda arm: draws[arm] + bias.get(arm, 0.0),
@@ -71,6 +74,42 @@ class Bandit:
 
     def update(self, context: str, arm: str, reward: float) -> None:
         self.beliefs[(context, arm)].update(reward)
+
+
+class Hunger:
+    """A pull towards the arms the wall has not shown for a while.
+
+    Each arm's pull grows by per_min for every minute since it was last on
+    the wall, up to cap, and drops to nothing the moment it is shown. Time
+    is counted from the controller's start for an arm not yet shown, so at
+    start every arm pulls equally and nothing changes. It is added to the
+    Thompson draw (which runs 0 to 1), so it tilts the machine's choice
+    towards unvisited ground without ever choosing by itself. Asked for by
+    Sam on 28 Nov 2026, after the wall kept returning to the two cued arms.
+    """
+
+    def __init__(self, cfg: dict, arms: list[str]):
+        self.per_min = cfg["per_min"]
+        self.cap = cfg["cap"]
+        self.arms = list(arms)
+        self.clear()
+
+    def clear(self) -> None:
+        """Forget what was shown; the clock restarts at the next look."""
+        self.last_seen: dict[str, float] = {}
+        self._start: float | None = None
+
+    def seen(self, arm: str, t: float) -> None:
+        """The arm is on the wall now."""
+        if arm in self.arms:
+            self.last_seen[arm] = t
+
+    def bias(self, now: float) -> dict[str, float]:
+        """The pull per arm name at this moment."""
+        if self._start is None:
+            self._start = now
+        return {arm: min(self.cap, self.per_min * max(0.0, now - self.last_seen.get(arm, self._start)) / 60.0)
+                for arm in self.arms}
 
 
 class ActionBias:

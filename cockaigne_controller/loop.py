@@ -25,7 +25,7 @@ from __future__ import annotations
 import datetime
 import random
 
-from .bandit import ActionBias, Bandit, reward_from_delta
+from .bandit import ActionBias, Bandit, Hunger, reward_from_delta
 from .clipmap import BARREN, ClipMap, node_name, node_ring
 from .personality import personality_for, priors
 
@@ -51,6 +51,7 @@ class Controller:
         contexts = [name for _, name in cfg["occupancy"]["bands"]]
         self.bandit = Bandit(list(self.arms.values()), contexts, self.rng)
         self.action_bias = ActionBias(cfg["action_bias"], cfg["occupancy"]["band_size"])
+        self.hunger = Hunger(cfg["hunger"], list(self.arms.values()))
         self.personality: str | None = None
         self.heading: str | None = None   # arm letter kept while climbing; see _heading_arm
         self.reward_scale = cfg["bandit"]["reward_scale"]
@@ -108,6 +109,7 @@ class Controller:
         self.bandit.reset(priors(params, list(self.arms.values())))
         self._pending_reward = None
         self.action_bias.clear()
+        self.hunger.clear()
         self.heading = None
         if ledger:
             ledger.append("day_start", personality=name)
@@ -118,6 +120,7 @@ class Controller:
         """The clip is confirmed showing: the wall is now at its destination,
         and the clip starts earning its reward."""
         self.displayed = decision["to"]
+        self.hunger.seen(decision["arm"], t)
         self._pending_reward = {"arm": decision["arm"], "context": decision["context"],
                                 "t_fired": t, "c_start": None}
 
@@ -145,7 +148,8 @@ class Controller:
             reason = "ring"
         else:
             context = self.context()
-            order, reason = self.bandit.rank(context, self.action_bias.bias(context, now))
+            order, reason = self.bandit.rank(context, self.action_bias.bias(context, now),
+                                             self.hunger.bias(now))
         by_name = {name: letter for letter, name in self.arms.items()}
         return [by_name[name] for name in order], reason
 

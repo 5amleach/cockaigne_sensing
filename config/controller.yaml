@@ -56,6 +56,14 @@ action_bias:
   sitting_baseline_s: 600    # sitting has no rate in Contract 2, so the controller keeps its own baseline
   sitting_baseline_floor: 0.02  # the baseline is never below this, so a first sitter reads as a spike, not infinity
 
+hunger:
+  # A pull towards arms the wall has not shown for a while (Sam, 28 Nov 2026), added to the
+  # bandit's draw (0..1). Replayed on the 27 Nov public session with phone and sitting cued:
+  # the six uncued arms went from 5% to 8% of moves each, the two cued arms from 37% and 31%
+  # to 26% and 24%, and a seen action won its move about half the time instead of 3 in 4.
+  per_min: 0.05   # pull gained per minute unseen
+  cap: 0.5        # the most pull an arm can gain; reached after 10 minutes unseen
+
 personalities:
   # prior_strength is how many pseudo-observations the day starts with: low commits fast.
   # storm_prior is Storm's prior mean (risk appetite); every other arm starts at 0.5.

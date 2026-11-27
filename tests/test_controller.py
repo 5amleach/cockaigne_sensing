@@ -399,7 +399,7 @@ def test_a_climb_keeps_its_arm_unless_an_action_turns_it():
     step(c, 60.0)
     other = next(n for n in c.bandit.arms if n[0] != c.displayed[0])
     order = [other] + [n for n in c.bandit.arms if n != other]
-    c.bandit.rank = lambda context, bias: (order, "action_bias")
+    c.bandit.rank = lambda context, bias, hunger=None: (order, "action_bias")
     c.observe(crowd(119.0, 3))
     d = step(c, 120.0)
     assert d["to"] == other[0] + "1"    # sideways onto the new arm first, then up it

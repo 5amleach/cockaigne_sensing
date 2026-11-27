@@ -182,6 +182,42 @@ def test_day_start_resets_beliefs_and_notes_the_ledger(tmp_path):
                             {k: cfg[k] for k in ("personality_order", "personalities")})[0]]
 
 
+def test_hunger_grows_while_unseen_and_resets_when_shown():
+    from cockaigne_controller.bandit import Hunger
+    h = Hunger({"per_min": 0.05, "cap": 0.5}, ARMS)
+    assert set(h.bias(0.0).values()) == {0.0}          # at start every arm pulls equally
+    h.seen("furniture", 60.0)
+    pull = h.bias(300.0)                                # five minutes in
+    assert pull["storm"] == pytest.approx(0.25)         # never shown: counted from the start
+    assert pull["furniture"] == pytest.approx(0.2)      # shown four minutes ago
+    h.seen("furniture", 300.0)
+    assert h.bias(300.0)["furniture"] == 0.0            # shown now
+    assert h.bias(3600.0)["storm"] == 0.5               # capped
+    h.seen("barren", 300.0)                             # Barren is nobody's arm
+    assert "barren" not in h.bias(300.0)
+
+
+def test_hunger_spreads_the_wall_and_is_reported_as_the_bandit():
+    """With flat beliefs and a steady lean on two arms, the hunger lets the
+    other six arms through, and a win it decides is the machine's own."""
+    from cockaigne_controller.bandit import Hunger
+    lean = {"machinery": 0.7, "furniture": 0.7}
+    def shares(per_min):
+        bandit = Bandit(ARMS, CONTEXTS, rng=random.Random(11))
+        h = Hunger({"per_min": per_min, "cap": 0.5}, ARMS)
+        picks, reasons = [], []
+        for minute in range(400):
+            order, reason = bandit.rank("small", lean, h.bias(60.0 * minute))
+            h.seen(order[0], 60.0 * minute)
+            picks.append(order[0]); reasons.append((order[0], reason))
+        return {a: picks.count(a) / len(picks) for a in ARMS}, reasons
+    without, _ = shares(0.0)
+    with_hunger, reasons = shares(0.05)
+    others = [a for a in ARMS if a not in lean]
+    assert sum(with_hunger[a] for a in others) > 2 * sum(without[a] for a in others)
+    assert all(r == "bandit" for a, r in reasons if a in others)   # the lean never wins an unleaned arm
+
+
 def test_reward_flows_from_cohesion_into_the_belief():
     import random as _r
     from tests.helpers import full_pool, ARMS as ARM_LETTERS, crowd as crowd_msg
