@@ -4,12 +4,16 @@ Input, each step: a list of floor sightings for one instant, carrying which
 camera saw each and its pixel rectangle, so merging can tell two views of
 one person from two people standing close. Output: the people list for Contract 1.
 
-The method is the plain one. Each known person is predicted forward along
-their velocity. Sightings are matched to predictions nearest first, within a
-gate. Matched people keep their id and are updated. An unmatched person is still
-reported at their predicted position for up to coast_s (their age keeps
-counting), then goes quiet, and is dropped if unseen for drop_after_s.
-Leftover sightings become new people. Velocity is the smoothed change in position over about a
+The method is the plain one. A sighting that carries the same camera track
+as a person's last sighting is that person. Each other known person is
+predicted forward along their velocity (for at most coast_s), and sightings
+are matched to predictions nearest first, within a gate. Matched people keep
+their id and are updated. An unmatched person is still reported at their
+predicted position for up to coast_s (their age keeps counting), then goes
+quiet but is remembered, and is dropped if unseen for drop_after_s. While
+remembered, a sighting near where they were lost takes their id back, so a
+visitor hidden behind another or out of view for a moment keeps one number
+(Sam, 27 Nov 2026). Leftover sightings become new people. Velocity is the smoothed change in position over about a
 second. No Kalman filter: the floor is flat and people are slow.
 """
 from __future__ import annotations
@@ -107,12 +111,28 @@ class FloorTracker:
         for pid in [pid for pid, p in self.people.items() if t - p.last_seen > self.drop_after_s]:
             del self.people[pid]
         sightings = self.merge(sightings)
-        # Predict where each known person should be now.
+        used_s, used_p = set(), set()
+        # The camera's own tracker follows people in pixels, where it is
+        # surer than the floor is: a sighting carrying the same camera track
+        # as a person's last sighting is that person, however far their feet
+        # seem to have jumped on the floor.
+        for i, s in enumerate(sightings):
+            for pid, p in self.people.items():
+                if pid not in used_p and p.view and (p.view["camera"], p.view["track"]) == (s.camera, s.det_id):
+                    used_s.add(i)
+                    used_p.add(pid)
+                    self._observe(p, t, s)
+                    break
+        # Predict where each other known person should be now. The prediction
+        # stops after coast_s, so someone unseen for longer is looked for
+        # near where they were lost, not walked off along an old heading.
         predicted = {}
         for pid, p in self.people.items():
-            dt = max(0.0, t - p.last_seen)
+            dt = min(max(0.0, t - p.last_seen), self.coast_s)
             predicted[pid] = (p.x + p.vx * dt, p.y + p.vy * dt)
-        # Match nearest pairs first, within the gate.
+        # Match nearest pairs first, within the gate. This is also how someone
+        # lost behind another visitor, or out of view for a while, gets their
+        # number back: they reappear within gate_m of where they were lost.
         pairs = []
         for i, s in enumerate(sightings):
             for pid, (px, py) in predicted.items():
@@ -120,7 +140,6 @@ class FloorTracker:
                 if d2 <= self.gate_m ** 2:
                     pairs.append((d2, i, pid))
         pairs.sort()
-        used_s, used_p = set(), set()
         for _, i, pid in pairs:
             if i in used_s or pid in used_p:
                 continue
@@ -162,6 +181,10 @@ class FloorTracker:
         return replace(p, x=x, y=y, view=None)  # not seen this step, so no view
 
     def _observe(self, p: Person, t: float, s: Sighting) -> None:
+        if t - p.last_seen > self.coast_s:
+            # Back after an absence: the old heading says nothing now.
+            p.vx = p.vy = 0.0
+            p.history = []
         p.x, p.y = s.x, s.y
         p.box_ratio, p.box_h = s.box_ratio, s.box_h
         p.view = _view(s)

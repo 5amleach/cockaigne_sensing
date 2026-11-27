@@ -68,6 +68,30 @@ def test_a_long_absent_id_is_not_revived():
     assert people[0].first_seen == 3600.0    # with a new age
 
 
+def test_same_camera_track_keeps_its_number_through_a_floor_jump():
+    # Legs hidden for a moment: the feet point leaps 2 m, but the camera's
+    # tracker kept its id, so the person keeps theirs.
+    tr = FloorTracker(gate_m=1.2)
+    a = tr.update(0.0, [Sighting(2.0, 4.0, 0.4, 300, 0.9, camera="cam1", det_id=5, box=(1, 1, 2, 2))])
+    b = tr.update(0.2, [Sighting(2.0, 6.0, 0.4, 150, 0.9, camera="cam1", det_id=5, box=(1, 1, 2, 2))])
+    assert a[0].id == b[0].id == 1
+
+
+def test_a_visitor_lost_for_half_a_minute_gets_their_number_back():
+    tr = FloorTracker(drop_after_s=60.0, coast_s=1.0, gate_m=1.2)
+    for i in range(10):   # walking, then out of view at y=3.0
+        tr.update(i * 0.2, [Sighting(2.0, 2.1 + 0.1 * i, 0.4, 300, 0.9, camera="c", det_id=1)])
+    assert tr.update(10.0, []) == []    # quiet while unseen: not counted
+    # Back 30 s later, half a metre from where they were lost, with a new camera track.
+    people = tr.update(30.0, [Sighting(2.3, 3.4, 0.4, 300, 0.9, camera="c", det_id=9)])
+    assert [p.id for p in people] == [1]
+    assert people[0].vx == 0.0 and people[0].vy == 0.0   # the old heading is not kept
+    # Someone appearing far from anywhere a visitor was lost is a new number.
+    people = tr.update(30.2, [Sighting(2.3, 3.4, 0.4, 300, 0.9, camera="c", det_id=9),
+                              Sighting(0.5, 6.5, 0.4, 300, 0.9, camera="c", det_id=10)])
+    assert sorted(p.id for p in people) == [1, 2]
+
+
 def test_tracker_coasts_then_goes_quiet_then_drops():
     tr = FloorTracker(drop_after_s=2.0, coast_s=1.0)
     tr.update(0.0, [Sighting(1, 1, 0.4, 500, 0.9)])

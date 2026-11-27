@@ -25,10 +25,13 @@ How it works, in order:
    kept as the best view for box_ratio and box_h.
 
 5. Track. A plain constant-velocity tracker keeps one id per person across
-   the whole room, predicts where each will be, matches nearest first,
-   drops anyone unseen for drop_after_s. A person missed for a moment is
-   still reported at their predicted position for up to coast_s before
-   going quiet, so brief occlusion does not empty the room. See tracker.py.
+   the whole room. It trusts the camera's own track id first, then
+   predicts where each other person will be and matches nearest first. A
+   person missed for a moment is still reported at their predicted position
+   for up to coast_s before going quiet, so brief occlusion does not empty
+   the room. A quiet person is remembered, and gets their id back if seen
+   again near where they were lost, until unseen for drop_after_s. See
+   tracker.py.
 
 6. Emit Contract 1 with posture "standing", actions all zero, arousal 0.5
    and valence 0.0. features and actions overwrite those later.
