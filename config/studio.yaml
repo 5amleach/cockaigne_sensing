@@ -110,13 +110,13 @@ mood:
   happy_valence: 0.1      # valence above this reads happy
   sad_valence: -0.1       # valence below this reads sad, or annoyed when arousal is high
   annoyed_arousal: 0.6    # negative valence with arousal at or above this reads annoyed
-  closed_postures: [arms_folded, hands_on_hips]  # action-sense words that read bored, or annoyed when arousal is at annoyed_arousal; only seen when listed in actions.enabled (27 Nov 2026, Sam)
+  pose_moods: {arms_folded: bored, hands_on_hips: annoyed}  # an action-sense pose and the mood it reads as; only seen when the pose is in actions.enabled (Sam, 27 Nov 2026)
 
 actions:
   live: true              # whether the live launcher runs the action sense at all; switched on 24 Nov 2026 by Sam for Experiment 29 (phone only); Ollama starts with Windows
   model: qwen3-vl:4b-instruct   # Ollama model tag, chosen by Sam 16 Nov 2026 from the shed1 bench; "fake" answers none without looking
   ollama_url: http://127.0.0.1:11434   # the local model server; the code refuses any other machine
-  enabled: [phone]         # phone only from 24 Nov 2026: eating and drinking are not allowed in the LED room (Sam); was [phone, drink, eat]
+  enabled: [phone, arms_folded, hands_on_hips]  # poses added 27 Nov 2026 after Sam's live test (both read cleanly, phone unaffected); phone only from 24 Nov 2026: eating and drinking are not allowed in the LED room (Sam); was [phone, drink, eat]
   interval_s: 3.0         # the fastest any one person is asked about
   max_asks_per_s: 3.0     # ceiling on questions per second for the whole room; protects the graphics card that also plays the wall
   recheck_s: 1.0          # a person whose newest answer differs from the one before is asked again this soon

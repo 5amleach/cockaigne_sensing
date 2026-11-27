@@ -109,7 +109,7 @@ mood:
   happy_valence: 0.1      # valence above this reads happy
   sad_valence: -0.1       # valence below this reads sad, or annoyed when arousal is high
   annoyed_arousal: 0.6    # negative valence with arousal at or above this reads annoyed
-  closed_postures: [arms_folded, hands_on_hips]  # action-sense words that read bored, or annoyed when arousal is at annoyed_arousal; only seen when listed in actions.enabled (27 Nov 2026, Sam)
+  pose_moods: {arms_folded: bored, hands_on_hips: annoyed}  # an action-sense pose and the mood it reads as; only seen when the pose is in actions.enabled (Sam, 27 Nov 2026)
 
 actions:
   live: false             # whether the live launcher runs the action sense at all; false until a model has been chosen on the bench

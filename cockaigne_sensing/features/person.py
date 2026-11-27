@@ -177,12 +177,12 @@ class PersonScorer:
         """Happy, sad, bored or annoyed, held for label_dwell_s so it cannot flicker."""
         c = self.cfg
         straightness = self._straightness(st)
-        # Arms folded or hands on hips, as the action sense reads them, outrank
-        # the arithmetic: a closed stance reads bored, or annoyed when energetic.
-        closed = any(p.get("actions", {}).get(a, 0.0) >= self.count_min
-                     for a in c["closed_postures"])
-        if closed:
-            candidate = "annoyed" if p["arousal"] >= c["annoyed_arousal"] else "bored"
+        # A pose the action sense reads (arms folded, hands on hips) outranks
+        # the arithmetic: each pose reads as the mood config gives it.
+        posed = [mood for pose, mood in c["pose_moods"].items()
+                 if p.get("actions", {}).get(pose, 0.0) >= self.count_min]
+        if posed:
+            candidate = posed[0]
         elif p["valence"] <= c["sad_valence"]:
             candidate = "annoyed" if p["arousal"] >= c["annoyed_arousal"] else "sad"
         elif straightness < c["bored_straightness"] and p["arousal"] < c["bored_arousal_max"]:
