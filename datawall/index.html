@@ -268,6 +268,8 @@ function onCrowd(c) {
 // The fill is the reservoir (the banked level that picks the ring); the white
 // marker is the blended score it is chasing; the marks are the ring thresholds.
 const res = $('reservoir'), rctx = res.getContext('2d');
+// The level each ring needs, a copy of cohesion.ring_up in config/studio.yaml; keep the two the same (28 Nov 2026).
+const RING_UP = [0.2, 0.45, 0.72, 0.85];
 function drawReservoir() {
   const c = state.crowd; if (!c) return;
   const W = res.width, H = res.height, pad = 16, bw = W - 2 * pad;
@@ -284,7 +286,7 @@ function drawReservoir() {
   rctx.fillText('SCORE', Math.min(pad + bw * score + 8, W - 80), 22);
   rctx.strokeStyle = '#6b7786'; rctx.lineWidth = 1; rctx.fillStyle = '#6b7786';
   for (let k = 1; k <= 4; k++) {                                       // the ring marks
-    const x = pad + bw * 0.2 * k;
+    const x = pad + bw * RING_UP[k - 1];
     rctx.beginPath(); rctx.moveTo(x, 14); rctx.lineTo(x, H - 14); rctx.stroke();
     rctx.fillText(`R${k}`, x + 6, H - 18);
   }
