@@ -84,8 +84,8 @@ cohesion:
   proxy_spot_zero_m: 4.0  # at this distance or further from the viewing spot, position scores zero
   rise_rate_per_s: 0.02   # how fast the reservoir rises toward a higher score
   fall_rate_per_s: 0.01   # how fast it falls toward a lower score
-  ring_up:   [0.2, 0.4, 0.6, 0.8]   # reservoir level needed to reach ring 1, 2, 3, 4
-  ring_down: [0.1, 0.3, 0.5, 0.74]  # level below which the ring drops to 0, 1, 2, 3; 0.74 sits above the one-or-two-person ceiling
+  ring_up:   [0.2, 0.45, 0.72, 0.85]  # reservoir level needed to reach ring 1, 2, 3, 4; rings 2 to 4 raised 28 Nov 2026 (Sam; was 0.4, 0.6, 0.8) after the 27 Nov public session sat at Ring 3 or 4 from minute 2
+  ring_down: [0.1, 0.35, 0.66, 0.80]  # level below which the ring drops to 0, 1, 2, 3 (was 0.3, 0.5, 0.74); 0.80 sits above the one-or-two-person ceiling of 0.72, so Ring 4 stays a group's
   bored_ring_cap: 2       # while bored_cap_share of the people present read bored, the ring may not climb past this; a higher ring already reached is held (Sam, 27 Nov 2026)
   bored_cap_share: 0.5    # at least this share of the people present (a lone viewer counts as all of them)
 
