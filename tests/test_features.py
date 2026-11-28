@@ -198,6 +198,18 @@ def test_a_still_phone_user_is_not_attentive_and_lowers_coordination():
     assert last["coordination"] == 0.5     # was 1.0 when any still person counted
 
 
+def test_attention_remembers_the_last_minute():
+    # One still viewer glances at a phone for 6 s of a 60 s window: about 90%, not 0%.
+    stage = FeatureStage(load())
+
+    def script(t):
+        on_phone = 54.0 <= t < 60.0
+        return [dict(person(1, *SPOT, age=t), actions={"phone": 1.0 if on_phone else 0.0})]
+
+    crowds = run_room(stage, script, t1=59.5)
+    assert 0.85 <= crowds[-1]["attention"] <= 0.95
+
+
 def test_clustering_reads_gathering():
     tight = [person(1, 3.0, 3.5), person(2, 3.4, 3.5)]
     spread = [person(1, 0.5, 0.5), person(2, 5.6, 6.9)]

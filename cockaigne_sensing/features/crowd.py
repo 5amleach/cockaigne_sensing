@@ -18,7 +18,7 @@ from __future__ import annotations
 import math
 
 from .agreement import mood_agreement, social_synchrony
-from .attention import attention_score
+from .attention import AttentionMemory
 
 
 def _speed(p: dict) -> float:
@@ -91,7 +91,7 @@ def coordination_score(held: float, stillness: float, synchrony: float | None) -
     """The share of people held (still, or from 28 Nov attentive: attention.py)
     plus the movers' share times their synchrony. Someone still but not
     attentive adds nothing, nor does a lone walker (synchrony None)."""
-    return held + (1.0 - stillness) * (synchrony or 0.0)
+    return _clamp01(held + (1.0 - stillness) * (synchrony or 0.0))
 
 
 def spot_score(x: float, y: float, cohesion_cfg: dict) -> float:
@@ -195,6 +195,7 @@ class CrowdState:
         self.cfg = cfg["cohesion"]
         self.actions_cfg = cfg["actions"]
         self.reservoir = Reservoir(self.cfg["rise_rate_per_s"], self.cfg["fall_rate_per_s"])
+        self.attention = AttentionMemory(self.cfg["attention_window_s"])
         self.n_eff = 0.0
         self.smooth = 0.0
         self.ring = 0
@@ -221,8 +222,8 @@ class CrowdState:
         else:
             stillness = stillness_score(people, c["still_speed_mps"])
             synchrony = synchrony_score(people, c["still_speed_mps"])
-            attention = attention_score(people, c["still_speed_mps"], c["inattentive_actions"],
-                                        self.actions_cfg["count_min"])
+            attention = self.attention.update(people, t, c["still_speed_mps"], c["inattentive_actions"],
+                                              self.actions_cfg["count_min"])
             held = attention if c["coordination_from"] == "attention" else stillness
             signals = {
                 "clustering": clustering_score(people, msg["floor"]["w"], msg["floor"]["h"],
