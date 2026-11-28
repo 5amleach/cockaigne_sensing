@@ -600,7 +600,7 @@ const ARMS = { a: 'architecture', u: 'furniture', s: 'storm', r: 'rivers',
 const SENSES = {
   phone:   { arm: 'machinery', noun: 'PHONE USE', sighted: (id) => `PHONE SIGHTED. SUBJECT ${id}.`,
              seen: (p) => ((p.actions && p.actions.phone) || 0) >= SEEN_AT },
-  sitting: { arm: 'furniture', noun: 'SEATING', sighted: (id) => `SUBJECT ${id} SEATED.`,
+  sitting: { arm: 'furniture', noun: 'SITTING', sighted: (id) => `SUBJECT ${id} SEATED.`,
              seen: (p) => p.posture === 'sitting' },
 };
 const talk = {
@@ -672,9 +672,11 @@ function onDecisionStatement(d) {
     talk.first = `${noun} NOTED.`;
     talk.second = () => 'COHESION TOO LOW. RETURNING TO BARREN.';
   } else {
-    if (d.arm === arm) talk.first = d.reason === 'action_bias' ? `${noun} ABOVE NORMAL.` : `${noun} NOTED.`;
+    // Plain words (Sam, 28 Nov 2026): what was seen, the axis it leant to, the axis chosen.
+    const chosen = d.arm.toUpperCase();
+    if (d.arm === arm) talk.first = `${noun} SEEN. ${chosen} CHOSEN.`;
     else if (fromArm === arm) talk.first = `${arm.toUpperCase()} ALREADY REACHED.`;
-    else if (weighted(action, now)) talk.first = `${noun} WEIGHED AND OUTRANKED.`;
+    else if (weighted(action, now)) talk.first = `${noun} SEEN. ${arm.toUpperCase()} CONSIDERED, ${chosen} CHOSEN.`;
     else if (warm(now)) talk.first = `${noun} AT USUAL LEVEL.`;
     else talk.first = `${noun} NOTED.`;
     talk.second = (t) => `HEADING FOR ${d.arm.toUpperCase()}. ARRIVAL IN ${mmss(now + CLIP_MS - t)}`;
