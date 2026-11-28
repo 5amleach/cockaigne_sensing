@@ -37,7 +37,7 @@ import queue
 import time
 from pathlib import Path
 
-from .actions import ActionsWorker, make_model
+from .actions import ActionsWorker, make_facing_model, make_model
 from .bus import Ledger, LedgerEvents, Publisher, Recorder
 from .cameras import CameraWorker
 from .capture import Closeups
@@ -132,7 +132,8 @@ class Launcher:
             closeups = Closeups(cfg["cameras"], cfg["actions"],
                                 lambda name: by_name[name].latest_frame)
             actions = ActionsWorker(cfg["actions"], closeups,
-                                    make_model(cfg["actions"]), log)
+                                    make_model(cfg["actions"]), log,
+                                    facing_model=make_facing_model(cfg["actions"]))
             actions.start()
             log.info(f"action sense on, model {cfg['actions']['model']}")
         seeing = False   # whether the action sense was answering at the last look

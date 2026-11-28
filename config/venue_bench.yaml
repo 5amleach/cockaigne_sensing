@@ -50,8 +50,8 @@ cohesion:
   smooth_window_s: 10.0
   still_speed_mps: 0.15
   signals: [clustering, coordination]  # relational signals in use; coordination folds stillness and synchrony into one
-  coordination_from: attention  # who counts as held in coordination: attention (still and not on a phone; Sam, 28 Nov 2026) or stillness (any still person, as before)
-  inattentive_actions: [phone]  # doing any of these stops a still person counting as attentive
+  coordination_from: attention  # who counts as held in coordination: attention (still, not on a phone, back not turned; Sam, 28 Nov 2026) or stillness (any still person, as before)
+  inattentive_actions: [phone, back_turned]  # doing any of these stops a still person counting as attentive; back_turned needs actions.facing
   clustering_zero_at_ratio: 2.0  # spacing at this multiple of random placement scores 0; random spacing scores 0.5
   crowd_interval_s: 1.0   # how often the crowd state message is emitted
   occupancy_window_s: 10.0
@@ -110,6 +110,8 @@ actions:
   model: qwen3-vl:4b-instruct   # Ollama model tag, chosen by Sam 16 Nov 2026 from the shed1 bench; "fake" answers none without looking
   ollama_url: http://127.0.0.1:11434   # the local model server; the code refuses any other machine
   enabled: [phone, drink, eat]   # Sam confirmed 19 Sept 2026 that eat and drink are in scope
+  facing: false            # also ask which way each person faces; a back turned to cam1, which sits on the screen wall, reads as back_turned (Sam, 28 Nov 2026)
+  facing_interval_s: 6.0  # the fastest any one person is asked the facing question
   interval_s: 3.0         # the fastest any one person is asked about
   max_asks_per_s: 3.0     # ceiling on questions per second for the whole room; protects the graphics card that also plays the wall
   recheck_s: 1.0          # a person whose newest answer differs from the one before is asked again this soon

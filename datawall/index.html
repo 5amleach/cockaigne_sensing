@@ -254,7 +254,7 @@ function onCrowd(c) {
   $('ci-value').textContent = (100 * ci).toFixed(1);
   $('ix-solidarity').innerHTML = `${pct(c.clustering)}<small>%</small>`;
   $('ix-synchrony').innerHTML = `${pct(c.synchrony)}<small>%</small>`;
-  // Attention: still and not on a phone (28 Nov 2026); older recordings carry only stillness.
+  // Attention: still, not on a phone, back not turned (28 Nov 2026); older recordings carry only stillness.
   $('ix-attention').innerHTML = `${pct(c.attention ?? c.stillness)}<small>%</small>`;
   const phones = (c.actions && c.actions.phone) || 0;
   const tech = `${pct(c.n ? phones / c.n : 0)}<small>%</small>`;

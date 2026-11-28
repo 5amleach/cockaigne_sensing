@@ -24,6 +24,18 @@ import requests
 QUESTION = ("This is an infrared camera image of one person. "
             "What is the person doing? Answer with exactly one of: {words}.")
 
+# The second question, which way a person faces (28 Nov 2026). cam1 sits on
+# the main screen's wall, so a back turned to the camera is turned to the
+# screen. Asking whether the face can be seen, and not where the body points,
+# is the wording that worked on the 27 Nov footage: "away_from_camera" came
+# back for 12 of 72 crops and 11 were people turned away (the twelfth had his
+# head bowed). "sideways" also came back for half the people facing the
+# camera, so only "away_from_camera" is used. Nothing tells one face from another.
+FACING_QUESTION = ("This is an infrared camera image looking down at one person; if several "
+                   "people appear, judge the one in the centre. Can you see the person's face, "
+                   "or only the back or side of their head? Answer with exactly one of: {words}.")
+FACING_WORDS = ["toward_camera", "away_from_camera", "sideways"]
+
 
 def local_only(url: str) -> str:
     """The model server's address, refused unless it is this machine. The
@@ -37,9 +49,9 @@ def local_only(url: str) -> str:
 class OllamaModel:
     """Asks the configured Ollama model about one crop at a time."""
 
-    def __init__(self, cfg: dict):
+    def __init__(self, cfg: dict, question: str = QUESTION, words: list[str] | None = None):
         self.url = local_only(cfg["ollama_url"]) + "/api/chat"
-        self.words = list(cfg["enabled"]) + ["none"]
+        self.words = words or list(cfg["enabled"]) + ["none"]
         self.timeout_s = cfg["request_timeout_s"]
         self.body = {
             "model": cfg["model"], "stream": False,
@@ -51,7 +63,7 @@ class OllamaModel:
         }
         if cfg["no_think"]:
             self.body["think"] = False   # some models reason aloud first unless told not to
-        self.question = QUESTION.format(words=", ".join(self.words))
+        self.question = question.format(words=", ".join(self.words))
 
     def ask(self, crop: np.ndarray, timeout_s: float | None = None) -> str | None:
         """The model's one-word answer for this crop, or None for no answer.
@@ -93,3 +105,13 @@ def make_model(cfg: dict):
     if name == "fake" or name.startswith("fake:"):
         return FakeModel([w.strip() for w in name[5:].split(",") if w.strip()])
     return OllamaModel(cfg)
+
+
+def make_facing_model(cfg: dict):
+    """The facing question's model, or None when actions.facing is off. A
+    fake model always answers toward_camera."""
+    if not cfg["facing"]:
+        return None
+    if cfg["model"].startswith("fake"):
+        return FakeModel(["toward_camera"])
+    return OllamaModel(cfg, FACING_QUESTION, FACING_WORDS)

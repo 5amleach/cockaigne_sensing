@@ -45,14 +45,19 @@ class ActionsWorker(threading.Thread):
     """Asks the model about people in the room and keeps their scores."""
 
     def __init__(self, actions_cfg: dict, closeups, model, log,
-                 clock=time.monotonic, sleep=time.sleep):
+                 clock=time.monotonic, sleep=time.sleep, facing_model=None):
         """clock and sleep are the machine's own when live; a replay passes
-        ones that follow the recording's time instead."""
+        ones that follow the recording's time instead. facing_model, when
+        given, is also asked which way each person faces, at most every
+        facing_interval_s; its answer is reported as the action back_turned."""
         super().__init__(name="actions", daemon=True)
         self.cfg = actions_cfg
         self.closeups, self.model, self.log = closeups, model, log
         self.clock, self.sleep = clock, sleep
         self.votes = Votes(actions_cfg)
+        self.facing_model = facing_model
+        self.facing_votes = Votes(dict(actions_cfg, enabled=["away_from_camera"]))
+        self._faced_at: dict[int, float] = {}
         self.asked = 0                      # questions put to the model so far
         self._lock = threading.Lock()
         self._people: list[dict] = []       # the newest people list, only the fields needed
@@ -78,6 +83,9 @@ class ActionsWorker(threading.Thread):
         with self._lock:
             for p in people_msg["people"]:
                 p["actions"].update(self.votes.scores(p["id"], now))
+                if self.facing_model is not None:
+                    p["actions"]["back_turned"] = \
+                        self.facing_votes.scores(p["id"], now)["away_from_camera"]
             people_msg["actions_health"] = self.health(now)
         return people_msg
 
@@ -95,7 +103,9 @@ class ActionsWorker(threading.Thread):
         with self._lock:
             present = {p["id"] for p in self._people}
             self.votes.keep_only(present)
+            self.facing_votes.keep_only(present)
             self._asked_at = {i: t for i, t in self._asked_at.items() if i in present}
+            self._faced_at = {i: t for i, t in self._faced_at.items() if i in present}
             due = due_people(self._people, self._asked_at, self.votes, now, self.cfg)
         if not due:
             self._heartbeat(now)
@@ -131,11 +141,26 @@ class ActionsWorker(threading.Thread):
                 self._asked_at[person] = t
                 if word is not None:
                     self.votes.add(person, word, t)
+            self._ask_facing(person, crop, t)
         self._warn(self.clock())
         return len(batch)
 
-    def _question(self, crop: np.ndarray) -> tuple[str | None, float]:
-        """Put one question, no sooner than the budget allows."""
+    def _ask_facing(self, person: int, crop: np.ndarray, now: float) -> None:
+        """Ask which way this person faces, if facing is on and they are due.
+        The same crop is used, so no second picture is needed."""
+        if self.facing_model is None or self._halt.is_set():
+            return
+        if now - self._faced_at.get(person, float("-inf")) < self.cfg["facing_interval_s"]:
+            return
+        word, t = self._question(crop, self.facing_model)
+        with self._lock:
+            self._faced_at[person] = t
+            if word is not None:
+                self.facing_votes.add(person, word, t)
+
+    def _question(self, crop: np.ndarray, model=None) -> tuple[str | None, float]:
+        """Put one question, no sooner than the budget allows, to the action
+        model or the model given."""
         wait = self._next_ask - self.clock()
         if wait > 0:
             self.sleep(wait)
@@ -145,7 +170,7 @@ class ActionsWorker(threading.Thread):
         # hangs up, so a short wait here would abandon it every time and the
         # sense would never see (found 27 Nov 2026). Wait long enough instead.
         alive = self.health(self.clock())["alive"]
-        word = self.model.ask(crop, None if alive else self.cfg["load_timeout_s"])
+        word = (model or self.model).ask(crop, None if alive else self.cfg["load_timeout_s"])
         self.asked += 1
         t = self.clock()
         if word is not None:

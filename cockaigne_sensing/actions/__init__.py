@@ -19,8 +19,8 @@ length of one question.
 Run it from a recording:
     python -m cockaigne_sensing.actions.run people.jsonl --video cam1=clip.mkv --out out.jsonl
 """
-from .model import FakeModel, OllamaModel, make_model
+from .model import FakeModel, OllamaModel, make_facing_model, make_model
 from .votes import Votes
 from .worker import ActionsWorker, due_people
 
-__all__ = ["ActionsWorker", "due_people", "Votes", "make_model", "OllamaModel", "FakeModel"]
+__all__ = ["ActionsWorker", "due_people", "Votes", "make_model", "make_facing_model", "OllamaModel", "FakeModel"]

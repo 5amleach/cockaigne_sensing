@@ -21,7 +21,7 @@ import cv2
 from ..bus import Recorder, replay
 from ..capture import Closeups
 from ..config import load
-from .model import make_model
+from .model import make_facing_model, make_model
 from .worker import ActionsWorker
 
 
@@ -66,7 +66,7 @@ def main() -> None:
 
     closeups = Closeups([{"name": n, "file": p} for n, p in videos.items()], cfg, frame_at_clock)
     worker = ActionsWorker(cfg, closeups, make_model(cfg), logging.getLogger("actions"),
-                           clock=clock, sleep=clock.sleep)
+                           clock=clock, sleep=clock.sleep, facing_model=make_facing_model(cfg))
     rec = Recorder(args.out)
     n = 0
     seen: dict[str, int] = {}

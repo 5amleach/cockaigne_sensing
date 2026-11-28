@@ -142,6 +142,24 @@ def test_a_round_asks_within_budget_and_two_rounds_report_a_phone():
     filled = worker.fill(people_msg(clock.now, person(1), person(2)))
     assert [p["actions"]["phone"] for p in filled["people"]] == [1.0, 1.0]
     assert filled["people"][0]["actions"]["drink"] == 0.0
+
+
+def test_the_facing_question_reports_a_turned_back_and_is_asked_less_often():
+    clock = Clock()
+    facing = FakeModel(["away_from_camera"])
+    cfg = actions_cfg(facing_interval_s=6.0)
+    cams = [{"name": "cam1", "file": "x"}]
+    frame = np.full((2160, 3840, 3), 90, np.uint8)
+    worker = ActionsWorker(cfg, Closeups(cams, cfg, lambda name: frame), FakeModel(["none"]),
+                           LOG, clock=clock, sleep=clock.sleep, facing_model=facing)
+    for _ in range(4):                                  # four rounds, three seconds apart
+        worker.offer(people_msg(clock.now, person(1)))
+        worker.step()
+        clock.sleep(3.0)
+    assert facing.asked == 2                            # every six seconds, not every three
+    filled = worker.fill(people_msg(clock.now, person(1)))
+    assert filled["people"][0]["actions"]["back_turned"] == 1.0
+    assert filled["people"][0]["actions"]["phone"] == 0.0
     assert filled["actions_health"]["alive"]
 
 

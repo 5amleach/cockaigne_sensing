@@ -1,10 +1,12 @@
 """Attention: the share of people giving the wall their attention.
 
 A person counts as attentive when they stand still and are not doing any of
-the actions named in cohesion.inattentive_actions (the phone, from 28 Nov
-2026). Before that date attention was simply the share of people standing
-still, so someone still with their back to the wall, or still and scrolling a
-phone, counted as attentive (Sam, 28 Nov 2026: they should not).
+the actions named in cohesion.inattentive_actions: the phone, and
+back_turned, which the action sense reports when actions.facing is on and a
+person's back is turned to cam1 and so to the main screen. Before 28 Nov 2026
+attention was simply the share of people standing still, so someone still
+with their back to the wall, or still and scrolling a phone, counted as
+attentive (Sam, 28 Nov 2026: they should not).
 
 Only movement and the action sense's answers are used. Nothing here looks at
 a face or tells one person from another.
