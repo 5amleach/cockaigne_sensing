@@ -78,6 +78,7 @@ Controller → bus → data wall. Owned by the controller package (`cockaigne_co
 - `from` and `to` are nodes: `b` (Barren) or an arm letter plus a ring number.
 - `context` is the occupancy band: `solo`, `small`, `medium` or `large`.
 - `reason` is one of `ring`, `bandit`, `action_bias`, `path` (an intermediate step), `loop`, `probe`, `lateral` (holding a ring by moving sideways to another arm).
+- `avoided`, present only when used (added 28 Nov 2026), is the node the controller would have gone to but did not, because the wall showed it within the last `no_repeat.minutes`.
 - `confirmed` says whether Resolume confirmed the clip connected; when false, the wall's position was held and the move is retried next cycle.
 
 ## Ledger entries

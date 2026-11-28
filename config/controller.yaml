@@ -64,6 +64,14 @@ hunger:
   per_min: 0.05   # pull gained per minute unseen
   cap: 0.5        # the most pull an arm can gain; reached after 10 minutes unseen
 
+no_repeat:
+  # The wall does not go back to a node it arrived at less than this many minutes ago (Sam,
+  # 28 Nov 2026). Barren is exempt, a climb or descent the crowd asks for always goes ahead,
+  # and 0 turns the rule off. A ring has eight nodes and a clip lasts a minute, so at 8 or
+  # more a ring held that long has no node left that was not shown recently: the wall then
+  # takes the one shown longest ago, touring the eight axes in turn.
+  minutes: 8
+
 personalities:
   # prior_strength is how many pseudo-observations the day starts with: low commits fast.
   # storm_prior is Storm's prior mean (risk appetite); every other arm starts at 0.5.

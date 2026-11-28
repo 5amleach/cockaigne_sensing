@@ -39,9 +39,12 @@ def pool_288():
     return names
 
 
-def make_controller(pool=None, **cfg_over):
+def make_controller(pool=None, no_repeat_minutes=0, **cfg_over):
+    """The no-repeat rule is off unless a test asks for it, so the older
+    tests keep testing the moves they were written for."""
     cfg = load()
     cfg["controller"] = dict(cfg["controller"], **{"arm_chooser": "fixed", **cfg_over})
+    cfg["no_repeat"] = {"minutes": no_repeat_minutes}
     names = pool if pool is not None else full_pool()
     layout = {n: (1, i) for i, n in enumerate(names, start=1)}
     cmap = ClipMap(names, ARMS)

@@ -10,7 +10,8 @@ The ring comes from `ring_target` in the latest crowd state. The arm comes
 from the bandit (controller.arm_chooser "fixed" pins it instead). Holding a
 ring never leaves the ring: a loop clip where one exists, otherwise a
 sideways move to another arm along ring-preserving clips. Barren probes out
-to Ring 1 and returns.
+to Ring 1 and returns. A node the wall showed in the last few minutes is
+swapped for another on the same ring (recent.py, no_repeat in the config).
 
 Freshness is the crowd message's own clock: if `t` has not advanced for
 blind_after_s on the controller's clock, the controller is blind and steps
@@ -28,6 +29,7 @@ import random
 from .bandit import ActionBias, Bandit, Hunger, reward_from_delta
 from .clipmap import BARREN, ClipMap, node_name, node_ring
 from .personality import personality_for, priors
+from .recent import Recent
 
 
 class Controller:
@@ -52,6 +54,7 @@ class Controller:
         self.bandit = Bandit(list(self.arms.values()), contexts, self.rng)
         self.action_bias = ActionBias(cfg["action_bias"], cfg["occupancy"]["band_size"])
         self.hunger = Hunger(cfg["hunger"], list(self.arms.values()))
+        self.recent = Recent(cfg["no_repeat"]["minutes"])
         self.personality: str | None = None
         self.heading: str | None = None   # arm letter kept while climbing; see _heading_arm
         self.reward_scale = cfg["bandit"]["reward_scale"]
@@ -110,6 +113,7 @@ class Controller:
         self._pending_reward = None
         self.action_bias.clear()
         self.hunger.clear()
+        self.recent.clear()
         self.heading = None
         if ledger:
             ledger.append("day_start", personality=name)
@@ -121,6 +125,7 @@ class Controller:
         and the clip starts earning its reward."""
         self.displayed = decision["to"]
         self.hunger.seen(decision["arm"], t)
+        self.recent.arrive(decision["to"], t)
         self._pending_reward = {"arm": decision["arm"], "context": decision["context"],
                                 "t_fired": t, "c_start": None}
 
@@ -195,6 +200,20 @@ class Controller:
         self.warnings.append(f"no ring-preserving move from {frm}; leaving the ring")
         return self.map.next_step(frm, lateral) or frm, "lateral"
 
+    def _fresh_instead(self, frm: str, planned: str, ranked: list[str], t: float) -> str:
+        """A node to go to instead of one the wall showed recently (recent.py).
+        Only nodes on the planned ring are considered, so the crowd's ring
+        always wins: a climb or a descent goes ahead even to a recent node,
+        since from one node there is only one way up or down. Among the nodes
+        not shown recently the best-ranked axis wins, so a seen action and the
+        bandit still count. When all were shown recently: the one shown longest ago."""
+        same_ring = [n for n in self.map.neighbours(frm) if node_ring(n) == node_ring(planned)]
+        free = [n for n in same_ring if not self.recent.is_recent(n, t)]
+        if free:
+            rank = {letter: i for i, letter in enumerate(ranked)}
+            return min(free, key=lambda n: rank.get(n[0], len(rank)))
+        return min(same_ring, key=self.recent.last_arrived, default=planned)
+
     def decide(self, t: float) -> tuple[dict, tuple[int, int]]:
         """One plan: the Contract 3 message and the (layer, index) to fire.
         The wall's position is advanced by confirm_fired(), not here."""
@@ -218,6 +237,14 @@ class Controller:
             to, reason = target, base_reason
         else:
             to, reason = self._toward(frm, target), "path"
+        avoided = None
+        if to and not self.is_blind(t) and self.recent.is_recent(to, t):
+            fresh = self._fresh_instead(frm, to, ranked, t)
+            if fresh != to:
+                avoided, to = to, fresh
+                self.heading = to[0]   # carry on from the new axis, not back to the old
+                if frm != BARREN and node_ring(to) == node_ring(frm):
+                    reason = "lateral"
         clip = self.map.clip_for(frm, to) if to else None
         if clip is None:
             # A validated pool cannot reach here either; take any way out
@@ -234,4 +261,6 @@ class Controller:
             "context": self.context(), "ring_target": self.ring,
             "personality": self.personality,
         }
+        if avoided:
+            decision["avoided"] = avoided   # the node it would have gone to, shown recently
         return decision, (layer, index)

@@ -765,6 +765,8 @@ function onDecisionStatement(d) {
     const chosen = d.arm.toUpperCase();
     if (d.arm === arm) talk.first = `${noun} SEEN. ${chosen} CHOSEN.`;
     else if (fromArm === arm) talk.first = `${arm.toUpperCase()} ALREADY REACHED.`;
+    // The controller does not go back to a node shown in the last few minutes (no_repeat in controller.yaml).
+    else if (d.avoided && ARMS[d.avoided[0]] === arm) talk.first = `${noun} SEEN. ${arm.toUpperCase()} SHOWN RECENTLY, ${chosen} CHOSEN.`;
     else if (weighted(action, now)) talk.first = `${noun} SEEN. ${arm.toUpperCase()} CONSIDERED, ${chosen} CHOSEN.`;
     else if (warm(now)) talk.first = `${noun} AT USUAL LEVEL.`;
     else talk.first = `${noun} NOTED.`;
@@ -800,7 +802,7 @@ function tick() {
   const link = state.linked && age < 5
     ? `<span class="ok">LINKED</span>` : `<span class="bad">${state.linked ? 'NO SIGNAL' : 'RECONNECTING'}</span>`;
   const d = state.decision;
-  const wall = d ? `wall ${d.to}  ring ${d.ring_target}  arm ${d.arm}  ${d.reason}${d.confirmed === false ? '  UNCONFIRMED' : ''}`
+  const wall = d ? `wall ${d.to}  ring ${d.ring_target}  arm ${d.arm}  ${d.reason}${d.avoided ? `  (${d.avoided} shown recently)` : ''}${d.confirmed === false ? '  UNCONFIRMED' : ''}`
                  : (state.crowd ? `ring ${state.crowd.ring_target}  (no controller)` : 'wall —');
   $('telemetry').innerHTML =
     `${link} ${busUrl}  ·  ${(state.count / Math.max(up, 1)).toFixed(1)} msg/s  ·  up ${fmt(up)}\n` +
