@@ -203,6 +203,7 @@ function connect() {
     if (msg.stream === 'crowd') onCrowd(msg);
     else if (msg.stream === 'people') { state.people = msg; noteTrails(msg); noteSightings(msg); drawPlan(); }
     else if (msg.stream === 'decision') { state.decision = msg; onDecisionStatement(msg); }
+    else if (msg.stream === 'overlay') onOverlayStatement(msg);
   };
   ws.onclose = () => { state.linked = false; setTimeout(connect, 2000); };  // retry, forever
   ws.onerror = () => ws.close();
@@ -674,6 +675,14 @@ function onDecisionStatement(d) {
     talk.second = (t) => `HEADING FOR ${d.arm.toUpperCase()}. ARRIVAL IN ${mmss(now + CLIP_MS - t)}`;
   }
   talk.until = now + CLIP_MS;
+}
+
+// An overlay (falling chairs, a walking pig) has just started on the wall.
+// Its line holds for twenty seconds; a move that fires meanwhile replaces it.
+function onOverlayStatement(o) {
+  talk.first = `${o.says}.`;
+  talk.second = null;
+  talk.until = Date.now() + 20000;
 }
 
 function drawStatement() {

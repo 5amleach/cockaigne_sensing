@@ -98,3 +98,11 @@ picture:
   play_mode: "Play Once & Hold"        # set by `python -m cockaigne_controller.hold_pictures`: a clip that
                                        # ends a moment before the next fire holds its last frame instead of
                                        # looping back to its first (the frame-or-two flash, 27 Nov 2026)
+
+overlays:
+  # Short clips on their own layers above the landscape, fired a second or two after
+  # someone sits or uses a phone (Sam, 28 Nov 2026), so a visitor sees that it counted.
+  # clip: the clip's name in the composition; action: the crowd count that triggers it;
+  # rest_s: the least time between two runs; says: the data wall's line when it fires.
+  chairs: {clip: chairs_ekstrem_v2_hapalpha_8064x1176, action: sitting, rest_s: 300, says: "PERSON SITTING: RELEASING CHAIRS"}
+  pig:    {clip: pig_walk_bottom_hapalpha_8064x1176,    action: phone,   rest_s: 600, says: "PHONE USE: RELEASING PIG"}

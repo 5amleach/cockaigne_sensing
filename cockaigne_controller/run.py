@@ -37,6 +37,7 @@ from .clipmap import ClipMap
 from .clock import ClipClock
 from .config import load
 from .loop import Controller
+from .overlays import Overlays
 from .resolume import Resolume, layout_from_composition
 
 CROWD_FIELDS = ("t", "n", "n_smooth", "ring_target", "cohesion_smooth")
@@ -114,11 +115,14 @@ class BusLink:
     ignored, and any connection-level error leads back to the retry loop."""
 
     def __init__(self, url: str, controller: Controller, log: logging.Logger,
-                 reconnect_s: float):
+                 reconnect_s: float, overlays: Overlays | None = None,
+                 resolume: Resolume | None = None):
         self.url = url
         self.controller = controller
         self.log = log
         self.reconnect_s = reconnect_s
+        self.overlays = overlays
+        self.resolume = resolume
         self.ws = None
 
     async def keep_connected(self) -> None:
@@ -149,7 +153,21 @@ class BusLink:
         if not valid_crowd(msg):
             self.log.warning(f"crowd message missing or bad fields, ignored: {str(msg)[:120]}")
             return
-        self.controller.observe(msg, time.monotonic())
+        now = time.monotonic()
+        self.controller.observe(msg, now)
+        if self.overlays and self.resolume:
+            for item in self.overlays.due(msg, now):
+                self._fire_overlay(item)
+
+    def _fire_overlay(self, item: dict) -> None:
+        """Start one overlay clip at once and tell the data wall what it is."""
+        layer, index = item["where"]
+        sent = self.resolume.fire_clip(layer, index)
+        self.log.info(f"overlay {item['name']} (layer {layer} clip {index})"
+                      f"{'' if sent else ' NOT SENT'}: {item['says']}")
+        if sent:
+            asyncio.create_task(self.send({"stream": "overlay", "what": item["name"],
+                                           "says": item["says"], "clip": item["name"]}))
 
     async def send(self, message: dict) -> None:
         if self.ws is None:
@@ -199,7 +217,11 @@ async def run(cfg: dict, layout_path: str | None = None, record: str | None = No
     sound = Sound(res_cfg["sound_layers"])
     ledger = Ledger(cfg["ledger_path"])
     recorder = Recorder(record) if record else None
-    link = BusLink(cfg["bus"]["url"], controller, log, cfg["controller"]["reconnect_s"])
+    overlays = Overlays(cfg.get("overlays"), layout)
+    for m in overlays.missing:
+        log.warning(f"overlay off, {m}")
+    link = BusLink(cfg["bus"]["url"], controller, log, cfg["controller"]["reconnect_s"],
+                   overlays, None if layout_path else resolume)
     link_task = asyncio.create_task(link.keep_connected())
     pending = None
     was_blind = False
