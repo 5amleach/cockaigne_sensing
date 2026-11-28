@@ -78,8 +78,14 @@
   #ci-row { display: flex; align-items: baseline; gap: 28px; }
   #ci-value { font-size: 258px; font-weight: 300; line-height: 0.9; letter-spacing: -0.03em; }
   #ci-unit { font-size: 56px; color: var(--dim); font-weight: 300; }
-  #history { display: block; width: 1308px; height: 210px; margin-top: 22px;
+  /* The index and its history share the top with the journey map (28 Nov 2026). */
+  #top { display: grid; grid-template-columns: 1fr 460px; gap: 40px; }
+  #top > div { min-width: 0; }
+  #history { display: block; width: 808px; height: 210px; margin-top: 22px;
              background: var(--panel); border: 1px solid var(--rule); }
+  #journey-head { display: flex; justify-content: space-between; align-items: baseline; }
+  #journey-count { font-family: var(--mono); font-size: 26px; color: var(--machine); }
+  #journey { display: block; width: 460px; height: 430px; margin-top: 8px; }
   #four { display: grid; grid-template-columns: repeat(4, 1fr); gap: 32px; margin-top: 26px; }
   /* The value sits at the bottom of its box, so the four figures stay on one
      line when a label (Social synchrony) wraps onto two (Sam, 28 Nov 2026). */
@@ -141,9 +147,17 @@
   </div>
 
   <div class="col">
-    <div class="label">Coherence index</div>
-    <div id="ci-row"><div id="ci-value" class="value">0.0</div><div id="ci-unit">/ 100</div></div>
-    <canvas id="history" width="1308" height="300"></canvas>
+    <div id="top">
+      <div>
+        <div class="label">Coherence index</div>
+        <div id="ci-row"><div id="ci-value" class="value">0.0</div><div id="ci-unit">/ 100</div></div>
+        <canvas id="history" width="808" height="300"></canvas>
+      </div>
+      <div>
+        <div id="journey-head"><div class="label">Journey</div><div id="journey-count" class="value"></div></div>
+        <canvas id="journey" width="460" height="430"></canvas>
+      </div>
+    </div>
     <div id="four">
       <div class="idx"><div class="label">Solidarity</div><div class="value" id="ix-solidarity">0<small>%</small></div></div>
       <div class="idx"><div class="label">Social synchrony</div><div class="value" id="ix-synchrony">0<small>%</small></div></div>
@@ -204,7 +218,7 @@ function connect() {
     state.lastMessageAt = Date.now(); state.count += 1;
     if (msg.stream === 'crowd') onCrowd(msg);
     else if (msg.stream === 'people') { state.people = msg; noteTrails(msg); noteSightings(msg); drawPlan(); }
-    else if (msg.stream === 'decision') { state.decision = msg; onDecisionStatement(msg); }
+    else if (msg.stream === 'decision') { state.decision = msg; onDecisionStatement(msg); noteJourney(msg); }
     else if (msg.stream === 'overlay') onOverlayStatement(msg);
   };
   ws.onclose = () => { state.linked = false; setTimeout(connect, 2000); };  // retry, forever
@@ -321,6 +335,81 @@ function drawHistory() {
   hctx.fillStyle = '#6b7786'; hctx.font = '20px "IBM Plex Mono", Consolas, monospace';
   hctx.fillText('20 MIN', pad + 6, H - pad - 8);
   hctx.textAlign = 'right'; hctx.fillText('NOW', W - pad - 6, H - pad - 8); hctx.textAlign = 'left';
+}
+
+// ---------- the journey map: where the wall has been lately ----------
+// Barren in the middle, eight axes as spokes, rings 1 to 4 outward. Each move
+// the controller announces shades the node it left and the node it heads for,
+// and the shade fades over JOURNEY_MS, so the map shows the recent route and
+// how much of the landscape it has covered. Kept in page memory only: a reload
+// starts it empty. ?fade=minutes changes the fade time.
+const JOURNEY_MS = (Number(new URLSearchParams(location.search).get('fade')) || 10) * 60000;
+// Clockwise from the top. The long names sit on the near-vertical spokes, where they have room.
+const AXES = ['a', 'c', 'f', 'u', 'm', 'h', 's', 'r'];
+const NODE_COUNT = 1 + AXES.length * 4;
+const journey = { seen: new Map(), moves: [], at: null };   // node -> last ms; [from, to, ms]; current node
+function noteJourney(d) {
+  if (!d.to) return;
+  const now = Date.now();
+  if (d.from) journey.seen.set(d.from, now);
+  journey.seen.set(d.to, now);
+  if (d.from && d.from !== d.to) journey.moves.push([d.from, d.to, now]);
+  journey.moves = journey.moves.filter((m) => now - m[2] < JOURNEY_MS);
+  journey.at = d.to;
+}
+const jc = $('journey'), jctx = jc.getContext('2d');
+const JX = 230, JY = 205, ringR = (k) => 30 + (k - 1) * 37;        // ring 4 at 141 px
+const axisAngle = (letter) => (AXES.indexOf(letter) + 0.5) * Math.PI / 4;   // from the top, clockwise
+function nodeXY(node) {
+  if (!node || node === 'b') return [JX, JY];
+  const a = axisAngle(node[0]), r = ringR(Number(node[1]));
+  return [JX + r * Math.sin(a), JY - r * Math.cos(a)];
+}
+function drawJourney() {
+  const now = Date.now(), fade = (t) => Math.max(0, 1 - (now - t) / JOURNEY_MS);
+  jctx.clearRect(0, 0, jc.width, jc.height);
+  jctx.strokeStyle = '#1c2430'; jctx.lineWidth = 1;                  // the empty map
+  for (let k = 1; k <= 4; k++) { jctx.beginPath(); jctx.arc(JX, JY, ringR(k), 0, 2 * Math.PI); jctx.stroke(); }
+  jctx.font = '18px "IBM Plex Mono", Consolas, monospace'; jctx.textBaseline = 'middle';
+  for (const l of AXES) {
+    const [x, y] = nodeXY(`${l}4`), a = axisAngle(l);
+    line(jctx, JX, JY, x, y);
+    const lx = JX + 172 * Math.sin(a), ly = JY - 172 * Math.cos(a);
+    jctx.textAlign = Math.abs(Math.sin(a)) < 0.5 ? 'center' : (Math.sin(a) > 0 ? 'left' : 'right');
+    jctx.fillStyle = '#6b7786'; jctx.fillText(ARMS[l].toUpperCase(), lx, ly);
+  }
+  for (const [from, to, t] of journey.moves) {                       // the route, fading
+    jctx.globalAlpha = fade(t); jctx.strokeStyle = '#4ea1ff'; jctx.lineWidth = 4;
+    const [x1, y1] = nodeXY(from), [x2, y2] = nodeXY(to);
+    jctx.beginPath();
+    if (from !== 'b' && to !== 'b' && from[1] === to[1]) {         // round the ring, the short way
+      const r = ringR(Number(from[1]));
+      let a1 = axisAngle(from[0]) - Math.PI / 2, a2 = axisAngle(to[0]) - Math.PI / 2;
+      while (a2 - a1 > Math.PI) a2 -= 2 * Math.PI;
+      while (a1 - a2 > Math.PI) a2 += 2 * Math.PI;
+      jctx.arc(JX, JY, r, a1, a2, a2 < a1);
+    } else { jctx.moveTo(x1, y1); jctx.lineTo(x2, y2); }
+    jctx.stroke();
+  }
+  jctx.globalAlpha = 1;
+  let visited = 0;
+  for (const node of ['b', ...AXES.flatMap((l) => [1, 2, 3, 4].map((k) => `${l}${k}`))]) {
+    const [x, y] = nodeXY(node), t = journey.seen.get(node), f = t ? fade(t) : 0;
+    if (f > 0) visited += 1;
+    jctx.beginPath(); jctx.arc(x, y, 9, 0, 2 * Math.PI);
+    jctx.fillStyle = '#07090c'; jctx.fill();
+    jctx.strokeStyle = '#6b7786'; jctx.lineWidth = 2; jctx.stroke();
+    if (f > 0) { jctx.globalAlpha = f; jctx.fillStyle = '#4ea1ff'; jctx.fill(); jctx.globalAlpha = 1; }
+  }
+  if (journey.at) {                                                   // where the wall is now, or heading
+    const [x, y] = nodeXY(journey.at);
+    jctx.fillStyle = '#d8dde3'; jctx.beginPath(); jctx.arc(x, y, 9, 0, 2 * Math.PI); jctx.fill();
+    jctx.strokeStyle = '#d8dde3'; jctx.lineWidth = 2; jctx.beginPath(); jctx.arc(x, y, 16, 0, 2 * Math.PI); jctx.stroke();
+  }
+  jctx.textAlign = 'center'; jctx.fillStyle = '#6b7786'; jctx.font = '17px "IBM Plex Mono", Consolas, monospace';
+  jctx.fillText(`BARREN AT CENTRE · SHADING FADES IN ${Math.round(JOURNEY_MS / 60000)} MIN`, JX, jc.height - 14);
+  jctx.textAlign = 'left'; jctx.textBaseline = 'alphabetic';
+  $('journey-count').textContent = `${visited} / ${NODE_COUNT} VISITED`;
 }
 
 // ---------- the plan view ----------
@@ -717,6 +806,7 @@ function tick() {
     `${link} ${busUrl}  ·  ${(state.count / Math.max(up, 1)).toFixed(1)} msg/s  ·  up ${fmt(up)}\n` +
     `${camText}${actText}\n${wall}`;
   drawStatement();
+  drawJourney();
   if (d && d.personality) {
     $('objective-text').textContent = `MAXIMISE COHESION. PERMITTED MEANS: ALL. DISPOSITION: ${d.personality.toUpperCase()}.`;
   }
