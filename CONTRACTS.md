@@ -52,7 +52,7 @@ All times are seconds as a float. Live, `t` is `time.monotonic()` on the sensing
 
 ```json
 {"t": 12.40, "n": 9, "n_smooth": 8.3,
- "clustering": 0.71, "synchrony": 0.44, "stillness": 0.33, "coordination": 0.62,
+ "clustering": 0.71, "synchrony": 0.44, "stillness": 0.33, "attention": 0.22, "coordination": 0.51,
  "cohesion_relational": 0.66, "cohesion_raw": 0.66, "cohesion_smooth": 0.52,
  "accumulator": 0.63, "ring_target": 2,
  "moods": {"happy": 3, "sad": 1, "bored": 4, "annoyed": 1},
@@ -61,7 +61,7 @@ All times are seconds as a float. Live, `t` is `time.monotonic()` on the sensing
 ```
 
 - `n` is the headcount. `n_smooth` is the headcount smoothed over about ten seconds; it is computed here and nowhere else, and the controller reads it for its occupancy bands.
-- The signal values run 0 to 1. `coordination` is stillness and synchrony folded into one: `stillness + (1 - stillness) * synchrony`. `cohesion_relational` is the geometric mean of clustering and coordination (1.0 for one person, 0.0 for an empty room); it is the number the data wall displays as the Coherence Index. `cohesion_raw` is the blend of the proxy score and `cohesion_relational`, and it is what drives the ring. `cohesion_smooth` is its ten-second weighted average. `accumulator` is the reservoir level, 0 to 1. `ring_target` is 0 (Barren) to 4.
+- The signal values run 0 to 1. `attention` (added 28 Nov 2026) is the share of people who are still and not doing any of `cohesion.inattentive_actions` (the phone); the data wall shows it as Attention. `coordination` folds the still and the moving into one: `held + (1 - stillness) * synchrony`, where `held` is `attention`, or `stillness` when `cohesion.coordination_from` says so. `cohesion_relational` is the geometric mean of clustering and coordination (1.0 for one person, 0.0 for an empty room); it is the number the data wall displays as the Coherence Index. `cohesion_raw` is the blend of the proxy score and `cohesion_relational`, and it is what drives the ring. `cohesion_smooth` is its ten-second weighted average. `accumulator` is the reservoir level, 0 to 1. `ring_target` is 0 (Barren) to 4.
 - `moods` and `actions` are counts of people. `action_rates` are each action's current rate divided by its running baseline, so 1.0 means normal and 3.0 means three times the usual amount. The controller uses `action_rates`, not counts, to bias the arm choice.
 
 ## Contract 3 — clip decision

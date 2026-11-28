@@ -173,6 +173,20 @@ def test_marching_group_scores_high_cohesion():
     assert last["cohesion_relational"] > 0.7
 
 
+def test_a_still_phone_user_is_not_attentive_and_lowers_coordination():
+    # Four people standing still in a group, two of them on phones the whole time.
+    stage = FeatureStage(load())
+
+    def script(t):
+        return [dict(person(i, 3.0 + 0.4 * i, 3.5, age=60 + t),
+                     actions={"phone": 1.0 if i < 2 else 0.0}) for i in range(4)]
+
+    last = run_room(stage, script, t1=30.0)[-1]
+    assert last["stillness"] == 1.0
+    assert last["attention"] == 0.5
+    assert last["coordination"] == 0.5     # was 1.0 when any still person counted
+
+
 def test_clustering_reads_gathering():
     tight = [person(1, 3.0, 3.5), person(2, 3.4, 3.5)]
     spread = [person(1, 0.5, 0.5), person(2, 5.6, 6.9)]

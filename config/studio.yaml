@@ -72,6 +72,8 @@ cohesion:
   smooth_window_s: 10.0   # weighted average window for the raw score
   still_speed_mps: 0.15   # slower than this counts as standing still
   signals: [clustering, coordination]  # relational signals in use; coordination folds stillness and synchrony into one
+  coordination_from: attention  # who counts as held in coordination: attention (still and not on a phone; Sam, 28 Nov 2026) or stillness (any still person, as before)
+  inattentive_actions: [phone]  # doing any of these stops a still person counting as attentive
   clustering_zero_at_ratio: 2.0  # spacing at this multiple of random placement scores 0; random spacing scores 0.5
   crowd_interval_s: 1.0   # how often the crowd state message is emitted
   occupancy_window_s: 10.0   # headcount is smoothed over this before it is used for blending

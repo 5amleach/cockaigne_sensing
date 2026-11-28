@@ -3,12 +3,10 @@
 The arithmetic behind Contract 2: no models, no camera knowledge, only the
 people list (Contract 1) in.
 
-Three raw signals say how much the crowd is acting as a group: clustering
-(gathered more than chance would place them), synchrony (moving the same way)
-and stillness (stopped at the same time). Synchrony and stillness fold into
-one signal, coordination, since a still crowd and a marching crowd are both
-acting together; the geometric mean of clustering and coordination is
-relational cohesion C, so a low score on either pulls the whole down. When
+Clustering (gathered more than chance would place them) and coordination
+(attentive and still, or moving the same way) say how much the crowd acts as
+a group; their geometric mean is relational cohesion C, so a low score on
+either pulls the whole down. When
 there is nobody to be relational with, a proxy score A stands in, built from
 each person's time in the room, stillness, and distance from the viewing spot.
 
@@ -28,6 +26,7 @@ from __future__ import annotations
 
 import math
 
+from .attention import attention_score
 
 def _speed(p: dict) -> float:
     return math.hypot(p["vx"], p["vy"])
@@ -91,12 +90,11 @@ def stillness_score(people: list[dict], still_speed: float) -> float:
     return sum(1 for p in people if _speed(p) < still_speed) / len(people)
 
 
-def coordination_score(stillness: float, synchrony: float) -> float:
-    """Stillness and synchrony folded into one signal: everyone still scores
-    1, everyone moving the same way scores 1, half still and half moving at
-    random about 0.5. As separate signals the geometric mean punished a still
-    crowd for not marching and vice versa (DECISIONS.md, 2026-10-05)."""
-    return stillness + (1.0 - stillness) * synchrony
+def coordination_score(held: float, stillness: float, synchrony: float) -> float:
+    """The share of people held (still, or from 28 Nov attentive: attention.py)
+    plus the movers' share times their synchrony. Someone still but not
+    attentive adds nothing (DECISIONS.md, 2026-10-05 and 2026-11-28)."""
+    return held + (1.0 - stillness) * synchrony
 
 
 def spot_score(x: float, y: float, cohesion_cfg: dict) -> float:
@@ -220,17 +218,19 @@ class CrowdState:
 
         if n == 0:
             signals = {"clustering": 0.0, "synchrony": 0.0, "stillness": 0.0,
-                       "coordination": 0.0}
+                       "attention": 0.0, "coordination": 0.0}
             relational = 0.0
         else:
             stillness = stillness_score(people, c["still_speed_mps"])
             synchrony = synchrony_score(people, c["still_speed_mps"])
+            attention = attention_score(people, c["still_speed_mps"], c["inattentive_actions"],
+                                        self.actions_cfg["count_min"])
+            held = attention if c["coordination_from"] == "attention" else stillness
             signals = {
                 "clustering": clustering_score(people, msg["floor"]["w"], msg["floor"]["h"],
                                                c["clustering_zero_at_ratio"]),
-                "synchrony": synchrony,
-                "stillness": stillness,
-                "coordination": coordination_score(stillness, synchrony),
+                "synchrony": synchrony, "stillness": stillness, "attention": attention,
+                "coordination": coordination_score(held, stillness, synchrony),
                 "spare1": 1.0, "spare2": 1.0,
             }
             # A set of one has no disagreement; the blend weight keeps it from
@@ -289,6 +289,7 @@ class CrowdState:
             "clustering": round(signals["clustering"], 3),
             "synchrony": round(signals["synchrony"], 3),
             "stillness": round(signals["stillness"], 3),
+            "attention": round(signals["attention"], 3),
             "coordination": round(signals["coordination"], 3),
             "cohesion_relational": round(relational, 3),
             "cohesion_raw": round(raw, 3),
