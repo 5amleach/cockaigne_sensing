@@ -93,7 +93,8 @@ mood:
   # Everything in this section is a starting guess, to be tuned on site against
   # footage from the final camera height. Treat the labels as provisional until then.
   label_dwell_s: 5.0      # a person's mood label holds at least this long before it can change
-  sitting_ratio: 0.75     # box width / height above this, while stopped, reads as sitting
+  sitting_ratio: 0.62     # box width / height above this, while stopped, reads as sitting. Was 0.75; cut 28 Nov 2026:
+                          # Sam seated on a chair read 0.66 to 0.73, standing still at most 0.55
   sitting_still_s: 2.0    # how long a person must have been stopped before sitting is read
   arousal_speed_full_mps: 1.2  # walking at this speed scores arousal 1.0
   body_window_s: 3.0      # bouncing and arm movement are judged over this window
