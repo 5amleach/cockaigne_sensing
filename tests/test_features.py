@@ -8,6 +8,7 @@ import math
 
 from cockaigne_sensing.config import load
 from cockaigne_sensing.features import FeatureStage
+from cockaigne_sensing.features.agreement import mood_agreement, social_synchrony
 from cockaigne_sensing.features.crowd import (clustering_score, ring_from_level,
                                               synchrony_score)
 from cockaigne_sensing.features.person import PersonScorer
@@ -149,8 +150,18 @@ def test_synchrony_reads_alignment():
     opposed = [person(1, 1, 1, vx=0.5, vy=0.0), person(2, 3, 3, vx=-0.5, vy=0.0)]
     assert synchrony_score(aligned, 0.15) == 1.0
     assert synchrony_score(opposed, 0.15) == 0.0
-    # One mover: no disagreement to measure.
-    assert synchrony_score([aligned[0], person(2, 3, 3)], 0.15) == 1.0
+    # One mover: nothing to measure, shown as n/a.
+    assert synchrony_score([aligned[0], person(2, 3, 3)], 0.15) is None
+    assert clustering_score([person(1, 1, 1)], W, L, 2.0) is None
+
+
+def test_mood_agreement_and_social_synchrony():
+    people = [person(i, i, 1) for i in range(4)]
+    assert mood_agreement(people, {0: "bored", 1: "bored", 2: "bored", 3: "happy"}) == 0.75
+    assert mood_agreement(people[:1], {0: "bored"}) is None
+    assert social_synchrony(None, 0.75) == 0.75
+    assert social_synchrony(0.5, 1.0) == 0.75
+    assert social_synchrony(None, None) is None
 
 
 def test_marching_group_scores_high_cohesion():

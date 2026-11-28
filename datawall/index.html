@@ -81,8 +81,10 @@
   #history { display: block; width: 1308px; height: 210px; margin-top: 22px;
              background: var(--panel); border: 1px solid var(--rule); }
   #four { display: grid; grid-template-columns: repeat(4, 1fr); gap: 32px; margin-top: 26px; }
-  .idx { border-top: 2px solid var(--rule); padding-top: 12px; }
-  .idx .value { font-size: 84px; font-weight: 400; line-height: 1.05; margin-top: 8px; }
+  /* The value sits at the bottom of its box, so the four figures stay on one
+     line when a label (Social synchrony) wraps onto two (Sam, 28 Nov 2026). */
+  .idx { border-top: 2px solid var(--rule); padding-top: 12px; display: flex; flex-direction: column; }
+  .idx .value { font-size: 84px; font-weight: 400; line-height: 1.05; margin-top: auto; padding-top: 8px; }
   .idx .value small { font-size: 38px; color: var(--dim); }
   #mech { margin-top: 26px; }
   #mech-head { display: flex; justify-content: space-between; align-items: baseline; }
@@ -213,6 +215,8 @@ connect();
 // ---------- the crowd state ----------
 const $ = (id) => document.getElementById(id);
 const pct = (v) => Math.round(100 * (v || 0));
+// A figure the machine could not measure (null: one person, or nobody to agree with) reads n/a.
+const pctOrNa = (v) => (v === null ? 'n/a' : `${pct(v)}<small>%</small>`);
 
 // The mood word is read off the Coherence Index. The bands are the machine's.
 function moodWord(c) {
@@ -252,8 +256,8 @@ function onCrowd(c) {
     el.textContent = (c.moods && c.moods[el.dataset.mood]) || 0;
   }
   $('ci-value').textContent = (100 * ci).toFixed(1);
-  $('ix-solidarity').innerHTML = `${pct(c.clustering)}<small>%</small>`;
-  $('ix-synchrony').innerHTML = `${pct(c.synchrony)}<small>%</small>`;
+  $('ix-solidarity').innerHTML = pctOrNa(c.clustering);
+  $('ix-synchrony').innerHTML = pctOrNa('social_synchrony' in c ? c.social_synchrony : c.synchrony);
   // Attention: still, not on a phone, back not turned (28 Nov 2026); older recordings carry only stillness.
   $('ix-attention').innerHTML = `${pct(c.attention ?? c.stillness)}<small>%</small>`;
   const phones = (c.actions && c.actions.phone) || 0;

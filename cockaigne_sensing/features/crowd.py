@@ -1,32 +1,25 @@
-"""Crowd cohesion, the reservoir and the ring, from the people list alone.
+"""Crowd cohesion, the reservoir and the ring (Contract 2), from the people list alone.
 
-The arithmetic behind Contract 2: no models, no camera knowledge, only the
-people list (Contract 1) in.
-
-Clustering (gathered more than chance would place them) and coordination
-(attentive and still, or moving the same way) say how much the crowd acts as
-a group; their geometric mean is relational cohesion C, so a low score on
-either pulls the whole down. When
-there is nobody to be relational with, a proxy score A stands in, built from
-each person's time in the room, stillness, and distance from the viewing spot.
+Clustering (gathered more than chance) and coordination (attentive and still,
+or moving the same way) say how much the crowd acts as a group; their
+geometric mean is relational cohesion C. When there is nobody to be relational
+with, a proxy score A stands in (time in the room, stillness, place).
 
 The two are blended, never switched: S = (1 - w) A + w C, with the weight w
 following the smoothed headcount (the single-viewer behaviour, DECISIONS.md
 2026-09-19). Two guards keep the top ring collective (2026-10-05): in the
-blend C counts as 0.0 below two people, so a lone person cannot inherit a
-departed crowd's weight (the reported cohesion_relational still says 1.0 for
-one person: the displayed claim, not the driver), and the blend sits under a
-headcount-following ceiling, 0.72 up to two people: a dyad is weak evidence.
-
-The smoothed score feeds a reservoir that rises slowly and drains more slowly;
-its level picks the ring, with a higher bar going up than coming down so the
-wall does not flicker at a boundary. The reservoir is never reset.
+blend C counts as 0.0 below two people (the reported cohesion_relational is
+displayed, not the driver), and the blend sits under a headcount-following
+ceiling, 0.72 up to two people. The smoothed score feeds a reservoir that
+rises slowly and drains more slowly; its level picks the ring, with hysteresis.
 """
 from __future__ import annotations
 
 import math
 
+from .agreement import mood_agreement, social_synchrony
 from .attention import attention_score
+
 
 def _speed(p: dict) -> float:
     return math.hypot(p["vx"], p["vy"])
@@ -34,6 +27,10 @@ def _speed(p: dict) -> float:
 
 def _clamp01(v: float) -> float:
     return max(0.0, min(1.0, v))
+
+
+def _round(v: float | None) -> float | None:   # None means n/a: could not be measured
+    return None if v is None else round(v, 3)
 
 
 def _alpha(dt: float, time_constant_s: float) -> float:
@@ -44,18 +41,18 @@ def _alpha(dt: float, time_constant_s: float) -> float:
 
 
 def clustering_score(people: list[dict], floor_w: float, floor_l: float,
-                     zero_at_ratio: float) -> float:
+                     zero_at_ratio: float) -> float | None:
     """How gathered the crowd is, 0 to 1, judged against chance.
 
     The mean distance from each person to their nearest neighbour is compared
     with what random placement would give for the same headcount on this floor
     (about 0.5 * sqrt(area / n)). Random spacing scores 0.5; spacing at
-    zero_at_ratio times random scores 0; a tight huddle scores near 1. One
-    person scores 1.0, because a set of one contains no disagreement.
+    zero_at_ratio times random scores 0; a tight huddle scores near 1. With
+    fewer than two people there is nothing to measure: None, shown as n/a.
     """
     n = len(people)
     if n < 2:
-        return 1.0
+        return None
     nearest = []
     for i, p in enumerate(people):
         d2 = min((p["x"] - q["x"]) ** 2 + (p["y"] - q["y"]) ** 2
@@ -66,17 +63,17 @@ def clustering_score(people: list[dict], floor_w: float, floor_l: float,
     return _clamp01(1.0 - ratio / zero_at_ratio)
 
 
-def synchrony_score(people: list[dict], still_speed: float) -> float:
+def synchrony_score(people: list[dict], still_speed: float) -> float | None:
     """How aligned the movement is, 0 to 1.
 
     The length of the sum of the movers' velocity vectors, divided by the sum
     of their speeds: 1 when everyone walks the same way, near 0 when movement
     cancels out. People standing still are left out. Fewer than two movers
-    means there is no disagreement to measure, so the score is 1.0.
+    means there is nothing to measure: None, shown as n/a (28 Nov 2026).
     """
     movers = [p for p in people if _speed(p) >= still_speed]
     if len(movers) < 2:
-        return 1.0
+        return None
     sx = sum(p["vx"] for p in movers)
     sy = sum(p["vy"] for p in movers)
     total = sum(_speed(p) for p in movers)
@@ -90,11 +87,11 @@ def stillness_score(people: list[dict], still_speed: float) -> float:
     return sum(1 for p in people if _speed(p) < still_speed) / len(people)
 
 
-def coordination_score(held: float, stillness: float, synchrony: float) -> float:
+def coordination_score(held: float, stillness: float, synchrony: float | None) -> float:
     """The share of people held (still, or from 28 Nov attentive: attention.py)
     plus the movers' share times their synchrony. Someone still but not
-    attentive adds nothing (DECISIONS.md, 2026-10-05 and 2026-11-28)."""
-    return held + (1.0 - stillness) * synchrony
+    attentive adds nothing, nor does a lone walker (synchrony None)."""
+    return held + (1.0 - stillness) * (synchrony or 0.0)
 
 
 def spot_score(x: float, y: float, cohesion_cfg: dict) -> float:
@@ -146,8 +143,9 @@ def interp_by_n(n_eff: float, table: list[list[float]]) -> float:
 
 
 def relational_cohesion(signals: dict[str, float], enabled: list[str]) -> float:
-    """Geometric mean of the enabled signals. Any zero pulls the whole to zero."""
-    values = [signals[name] for name in enabled]
+    """Geometric mean of the enabled signals that could be measured (n/a ones
+    are left out). Any zero pulls the whole to zero."""
+    values = [signals[name] for name in enabled if signals[name] is not None]
     product = math.prod(values)
     return product ** (1.0 / len(values)) if product > 0 else 0.0
 
@@ -218,7 +216,7 @@ class CrowdState:
 
         if n == 0:
             signals = {"clustering": 0.0, "synchrony": 0.0, "stillness": 0.0,
-                       "attention": 0.0, "coordination": 0.0}
+                       "attention": 0.0, "coordination": 0.0, "mood_agreement": None}
             relational = 0.0
         else:
             stillness = stillness_score(people, c["still_speed_mps"])
@@ -231,15 +229,14 @@ class CrowdState:
                                                c["clustering_zero_at_ratio"]),
                 "synchrony": synchrony, "stillness": stillness, "attention": attention,
                 "coordination": coordination_score(held, stillness, synchrony),
-                "spare1": 1.0, "spare2": 1.0,
+                "mood_agreement": mood_agreement(people, labels), "spare1": 1.0, "spare2": 1.0,
             }
-            # A set of one has no disagreement; the blend weight keeps it from
-            # counting. The data wall shows 100% and Population 1 side by side on purpose.
-            relational = 1.0 if n == 1 else relational_cohesion(signals, c["signals"])
+            # For one person clustering is n/a, so this is their coordination alone (Sam, 28 Nov 2026).
+            relational = relational_cohesion(signals, c["signals"])
 
         proxy = proxy_score(people, c)
         w = interp_by_n(self.n_eff, c["blend_weight_by_n"])
-        # In the blend, relational evidence needs two people; the reported value keeps 1.0 for one.
+        # In the blend, relational evidence needs two people.
         raw = (1.0 - w) * proxy + w * (relational if n >= 2 else 0.0)
         # The ceiling that keeps the top ring collective: 0.72 for one or two, none from four up.
         raw = min(raw, interp_by_n(self.n_eff, c["score_ceiling_by_n"]))
@@ -286,8 +283,10 @@ class CrowdState:
         return {
             "stream": "crowd", "t": round(t, 3), "n": n,
             "n_smooth": round(self.n_eff, 2),
-            "clustering": round(signals["clustering"], 3),
-            "synchrony": round(signals["synchrony"], 3),
+            "clustering": _round(signals["clustering"]),
+            "synchrony": _round(signals["synchrony"]),
+            "mood_agreement": _round(signals["mood_agreement"]),
+            "social_synchrony": _round(social_synchrony(signals["synchrony"], signals["mood_agreement"])),
             "stillness": round(signals["stillness"], 3),
             "attention": round(signals["attention"], 3),
             "coordination": round(signals["coordination"], 3),

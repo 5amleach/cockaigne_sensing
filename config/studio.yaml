@@ -71,7 +71,7 @@ floor_tracker:
 cohesion:
   smooth_window_s: 10.0   # weighted average window for the raw score
   still_speed_mps: 0.15   # slower than this counts as standing still
-  signals: [clustering, coordination]  # relational signals in use; coordination folds stillness and synchrony into one
+  signals: [clustering, coordination]  # relational signals in use; coordination folds stillness and synchrony into one; add mood_agreement to let mood agreement feed the ring (replay of 27 Nov: Ring 2 21% -> 42%, Ring 4 15% -> 9%)
   coordination_from: attention  # who counts as held in coordination: attention (still, not on a phone, back not turned; Sam, 28 Nov 2026) or stillness (any still person, as before)
   inattentive_actions: [phone, back_turned]  # doing any of these stops a still person counting as attentive; back_turned needs actions.facing
   clustering_zero_at_ratio: 2.0  # spacing at this multiple of random placement scores 0; random spacing scores 0.5
