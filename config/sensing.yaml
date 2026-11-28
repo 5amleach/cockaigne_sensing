@@ -97,6 +97,7 @@ mood:
   label_dwell_s: 5.0      # a person's mood label holds at least this long before it can change
   sitting_ratio: 0.75     # box width / height above this, while stopped, reads as sitting
   sitting_still_s: 2.0    # how long a person must have been stopped before sitting is read
+  sitting_edge_px: 10     # a rectangle whose bottom is this close to the picture's lower edge has its legs cut off: never read as sitting (28 Nov 2026)
   arousal_speed_full_mps: 1.2  # walking at this speed scores arousal 1.0
   body_window_s: 3.0      # bouncing and arm movement are judged over this window
   arousal_body_full: 0.15 # the rectangle's height and width wobbling by this fraction of its height scores arousal 1.0

@@ -38,6 +38,7 @@ class _PersonState:
     v_prev: tuple | None = None                 # (t, vx, vy) from the previous message
     ref_h: float = 0.0                          # standing-height reference in pixels, a decaying maximum
     stopped_since: float | None = None          # when the person last came to a stop
+    feet_cut: bool = False                      # the last rectangle ran off the bottom of the picture
     label: str | None = None                    # current mood label
     label_since: float = 0.0                    # when the label was adopted
     last_seen: float = 0.0
@@ -96,6 +97,9 @@ class PersonScorer:
         # step: a coasting person keeps an old rectangle that says nothing.
         if p.get("view"):
             st.body.append((t, float(p["box_h"]), p["box_ratio"] * p["box_h"]))
+            v = p["view"]
+            if v.get("box") and v.get("h"):
+                st.feet_cut = v["box"][3] >= v["h"] - self.cfg["sitting_edge_px"]
         st.body = [b for b in st.body if t - b[0] <= self.cfg["body_window_s"]]
         # The standing-height reference: a maximum that decays toward the
         # current height, so a walk toward or away from the camera washes out
@@ -116,7 +120,10 @@ class PersonScorer:
             return "walking"
         stopped_long_enough = (st.stopped_since is not None
                                and t - st.stopped_since >= self.cfg["sitting_still_s"])
-        if stopped_long_enough and p["box_ratio"] > self.cfg["sitting_ratio"]:
+        # A visitor close to the camera has their legs cut off by the bottom of
+        # the picture, which leaves a short, wide rectangle that looks like a
+        # sitter. Their shape says nothing about sitting, so it is not read.
+        if stopped_long_enough and not st.feet_cut and p["box_ratio"] > self.cfg["sitting_ratio"]:
             return "sitting"
         return "standing"
 
